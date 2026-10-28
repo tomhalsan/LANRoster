@@ -17,10 +17,40 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
             return dict(self._devices)
 
     def save_devices(self, devices: List[Device]) -> None:
+        """
+        Merges discovered devices into the active registry.
+        Retains previously identified hostnames and vendors so asleep Wi-Fi
+        devices don't lose identification or vanish between sweeps.
+        """
+        with self._lock:
+            for dev in devices:
+                if dev.ip in self._devices:
+                    existing = self._devices[dev.ip]
+                    # Retain known hostname if new sweep returned Unknown
+                    hostname = dev.hostname if dev.hostname != "Unknown" else existing.hostname
+                    source = dev.source if dev.hostname != "Unknown" else existing.source
+
+                    # Retain specific vendor if new sweep returned generic/private
+                    if dev.vendor in ("Generic Device", "Private/Randomized MAC") and existing.vendor not in ("Generic Device", "Private/Randomized MAC"):
+                        vendor = existing.vendor
+                    else:
+                        vendor = dev.vendor
+
+                    self._devices[dev.ip] = Device(
+                        ip=dev.ip,
+                        mac=dev.mac or existing.mac,
+                        hostname=hostname,
+                        source=source,
+                        vendor=vendor,
+                        last_seen=dev.last_seen or existing.last_seen,
+                    )
+                else:
+                    self._devices[dev.ip] = dev
+
+    def clear_devices(self) -> None:
+        """Explicitly clears stored devices (used when switching target subnets)."""
         with self._lock:
             self._devices.clear()
-            for dev in devices:
-                self._devices[dev.ip] = dev
 
     def get_scan_state(self) -> ScanState:
         with self._lock:

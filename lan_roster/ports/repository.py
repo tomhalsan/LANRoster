@@ -13,7 +13,12 @@ class DeviceRepositoryPort(ABC):
 
     @abstractmethod
     def save_devices(self, devices: List[Device]) -> None:
-        """Atomically replaces the active device registry."""
+        """Saves or merges discovered devices into the active registry."""
+        pass
+
+    @abstractmethod
+    def clear_devices(self) -> None:
+        """Clears all stored devices from the registry."""
         pass
 
     @abstractmethod

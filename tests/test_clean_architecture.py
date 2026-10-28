@@ -296,6 +296,48 @@ class TestAdaptersLayer(unittest.TestCase):
 
         self.assertIsInstance(repo.get_devices(), dict)
 
+    def test_device_repository_merging_and_retention(self):
+        repo = InMemoryDeviceRepository()
+
+        # Pass 1: Phone is awake, identified as Badunkadunk
+        dev1 = Device(
+            ip="10.0.0.18",
+            mac="82:11:02:26:FA:0F",
+            hostname="Badunkadunk",
+            source=HostnameSource.MDNS,
+            vendor="Apple iOS Device (Private MAC)",
+            last_seen="01:00:00",
+        )
+        repo.save_devices([dev1])
+        self.assertEqual(repo.get_devices()["10.0.0.18"].hostname, "Badunkadunk")
+
+        # Pass 2: Phone screen locked, returns Unknown hostname & Private MAC
+        dev2 = Device(
+            ip="10.0.0.18",
+            mac="82:11:02:26:FA:0F",
+            hostname="Unknown",
+            source=HostnameSource.UNKNOWN,
+            vendor="Private/Randomized MAC",
+            last_seen="01:00:30",
+        )
+        repo.save_devices([dev2])
+
+        # Roster MUST retain Badunkadunk and Apple iOS Device!
+        retained = repo.get_devices()["10.0.0.18"]
+        self.assertEqual(retained.hostname, "Badunkadunk")
+        self.assertEqual(retained.vendor, "Apple iOS Device (Private MAC)")
+        self.assertEqual(retained.last_seen, "01:00:30")
+
+        # Pass 3: Phone Wi-Fi in DTIM sleep during 2-second sweep window (misses ARP)
+        repo.save_devices([Device(ip="10.0.0.2", mac="AA:BB:CC:DD:EE:FF")])
+        # Phone is NOT wiped out!
+        self.assertIn("10.0.0.18", repo.get_devices())
+        self.assertEqual(len(repo.get_devices()), 2)
+
+        # Clear devices resets for subnet change
+        repo.clear_devices()
+        self.assertEqual(len(repo.get_devices()), 0)
+
 
 class TestPresentationLayer(unittest.TestCase):
     """4. Presentation / Primary Driving Adapter Tests: Flask Web UI & REST API."""
