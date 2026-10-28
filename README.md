@@ -161,6 +161,7 @@ See [TODO.md](TODO.md) for planned features including:
 - **Feature 4**: Custom Device Nicknames & Notes (Persistent Aliases)
 - **Feature 5**: Wake-on-LAN (WoL) Integration
 - **Feature 6**: Real-Time Ping Latency & Connection Quality
+- **Feature 7**: "Powered by Google" AI & Search Device Identification
 
 ---
 

@@ -58,3 +58,19 @@ This document tracks upcoming planned features and architectural enhancements fo
   - `domain/models.py`: Store `latency_ms: float | None`.
   - `ui/templates.py`: Add latency badge column with color-coding.
 
+---
+
+### Feature 7: "Powered by Google" AI & Search Device Identification
+- **Automatic Signature Resolution**: Resolves cryptic hardware models (e.g. `V505M-K09`, `SM-G998U`, `ESP_2A4F10`) and obscure component OUI vendors (e.g. `Liteon`, `Chongqing Fugui`) into exact commercial product names, brands, and categories using Google Search grounding.
+- **100% Free-Tier Compatible**: Designed for Google AI Studio's free tier (1,500 queries/day, 15 RPM) using `gemini-2.0-flash`.
+- **Persistent Local Cache**: Results stored in `~/.lan_roster/device_cache.json`. Each obscure signature is queried to Google **only once ever**, using 0 API calls on subsequent passes.
+- **Three-Tier User Experience**:
+  - **Tier 1 (No API Key)**: Runs 100% locally with Probes A–E + client-side 1-click **"🔍 Search Google"** deep-link button on unknown devices.
+  - **Tier 2 (Free Google AI Studio Key)**: Automatic silent background enrichment with Google Search Grounding.
+  - **Tier 3 (Paid/Enterprise Key)**: High-speed resolution across large multi-subnet environments.
+- **Clean Architecture Plan**:
+  - `ports/enricher.py`: `DeviceEnrichmentPort` contract.
+  - `adapters/enricher/gemini_enricher.py`: Adapter calling Gemini API with search grounding.
+  - `adapters/enricher/cached_enricher.py`: File-backed cache decorator.
+  - `ui/templates.py`: Display `✨ Google Identified` badge and 1-click Google search button for unknown devices.
+
