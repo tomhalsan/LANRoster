@@ -38,10 +38,20 @@ class ScanNetworkUseCase:
             # 2. Multi-protocol hostname resolution
             resolved_hosts = self.resolver.resolve_batch(all_ips)
 
+            # Sync discovered UPnP / SSDP metadata (Probe B) to manufacturer repository
+            if hasattr(self.resolver, "get_all_metadata") and hasattr(self.manufacturer_repo, "register_device_metadata"):
+                for m_ip, meta in self.resolver.get_all_metadata().items():
+                    if meta.get("manufacturer"):
+                        self.manufacturer_repo.register_device_metadata(
+                            ip=m_ip,
+                            manufacturer=meta["manufacturer"],
+                            model=meta.get("model", ""),
+                        )
+
             # 3. Assemble domain entities
             device_entities: List[Device] = []
             for ip, mac in discovered_nodes:
-                vendor = self.manufacturer_repo.get_manufacturer(mac)
+                vendor = self.manufacturer_repo.get_manufacturer(mac, ip=ip)
                 hostname, source = resolved_hosts.get(
                     ip, ("Unknown", HostnameSource.UNKNOWN)
                 )

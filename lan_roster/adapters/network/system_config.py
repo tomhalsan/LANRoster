@@ -39,3 +39,16 @@ class SystemNetworkConfigAdapter(NetworkConfigPort):
 
         return self.fallback_subnet
 
+    def detect_default_gateway(self) -> str | None:
+        """Detects the default gateway IP address from the routing table."""
+        try:
+            out = subprocess.check_output(
+                ["route", "-n", "get", "default"], timeout=2
+            ).decode()
+            for line in out.splitlines():
+                if "gateway:" in line:
+                    return line.split(":")[1].strip()
+        except Exception:
+            pass
+        return None
+

@@ -10,12 +10,14 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
 
 - **Layer 2 ARP Discovery**: Rapidly discovers all active IPv4 devices on the broadcast domain using Scapy.
 - **Multi-Protocol Hostname Resolution**:
-  - **mDNS / Bonjour (UDP 5353)**: Discovers macOS, iOS, Android, Apple TV, PlayStation, Smart TV, and IoT hostnames (`.local`).
+  - **mDNS / Bonjour (UDP 5353)**: Discovers macOS, iOS, Android, Apple TV, PlayStation, Smart TV, and IoT hostnames (`.local`), parsing both PTR and A record announcements.
   - **NetBIOS Name Service (NBNS, UDP 137)**: Concurrently queries Windows computers and Samba shares for their NetBIOS computer names.
-  - **SSDP / UPnP (UDP 1900)**: Discovers friendly device names for smart TVs, Google TVs, and media servers.
-  - **Unicast Reverse DNS**: Fallback PTR queries when local DNS servers are configured.
+  - **SSDP / UPnP & Google Cast (UDP 1900 / TCP 8008)**: Discovers friendly device names, manufacturers, and model descriptions for Smart TVs, media renderers, and Google Cast/Chromecast devices.
+  - **Unicast & Gateway Reverse DNS**: Queries local resolver and sends direct PTR queries to the network gateway router (UDP 53) to discover DHCP client names (e.g. `iPhone-7544`).
 - **Hardware & Vendor Fingerprinting**:
-  - Recognizes hardware manufacturers (Apple, Sony PlayStation, Intel, Arris/Comcast Gateways, Amazon, Google, TP-Link, Samsung, Vizio, etc.).
+  - Recognizes hardware manufacturers (Apple, Sony PlayStation, Intel, Arris/Comcast Gateways, Amazon, Google, TP-Link, Samsung, TCL, Vizio, etc.).
+  - **Apple Lockdown Probe**: Fingerprints Apple iOS / iPadOS devices via port 62078 (`apple-mobdev`), identifying iPhones even when using **Private / Randomized MAC** addresses.
+  - **UPnP / Cast Metadata Extraction**: Extracts manufacturer and model names directly from device XML/JSON descriptors.
   - Detects **Private / Randomized MAC** addresses used by modern mobile OS privacy features.
   - Flags firewalled Windows PCs so they can be easily identified even when in stealth mode.
 - **Dynamic Subnet Control**:

@@ -98,6 +98,14 @@ class SocketMDNSResolver(HostnameResolverPort):
                                     clean_target = target.rstrip(".")
                                     if clean_target:
                                         results[orig_ip] = (clean_target, HostnameSource.MDNS)
+                            elif rtype == 1 and rdlen == 4:  # A record (e.g. device.local -> IPv4)
+                                try:
+                                    ip_ans = socket.inet_ntoa(data[curr : curr + 4])
+                                    clean_name = qname.rstrip(".")
+                                    if clean_name and ip_ans in ips:
+                                        results[ip_ans] = (clean_name, HostnameSource.MDNS)
+                                except Exception:
+                                    pass
                             curr += rdlen
                 except socket.timeout:
                     pass

@@ -1,3 +1,4 @@
+import socket
 import urllib.request
 from typing import Dict
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
@@ -119,13 +120,50 @@ class HybridManufacturerRepository(ManufacturerRepositoryPort):
 
     def __init__(self) -> None:
         self._cache: Dict[str, str] = {}
+        self._device_metadata: Dict[str, Dict[str, str]] = {}
 
-    def get_manufacturer(self, mac_address: str) -> str:
+    def register_device_metadata(
+        self, ip: str, manufacturer: str, model: str = ""
+    ) -> None:
+        """Stores UPnP / SSDP or application-level metadata for an IP."""
+        if manufacturer:
+            self._device_metadata[ip] = {
+                "manufacturer": manufacturer,
+                "model": model,
+            }
+
+    @staticmethod
+    def check_apple_lockdown(ip: str, timeout: float = 0.3) -> bool:
+        """Probe A: Checks Apple's MobileDevice lockdown daemon (port 62078)."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(timeout)
+                return s.connect_ex((ip, 62078)) == 0
+        except Exception:
+            return False
+
+    def get_manufacturer(self, mac_address: str, ip: str | None = None) -> str:
         clean = mac_address.replace(":", "").replace("-", "").upper()
         if len(clean) >= 6:
             first_byte = int(clean[:2], 16)
+            is_randomized = bool(first_byte & 0x02)
+
+            # Check active metadata and probes if IP is provided
+            if ip:
+                # 1. UPnP / SSDP metadata (Probe B)
+                if ip in self._device_metadata:
+                    m = self._device_metadata[ip]
+                    manuf = m.get("manufacturer", "")
+                    model = m.get("model", "")
+                    if manuf:
+                        return f"{manuf} ({model})" if model else manuf
+
+                # 2. Apple iOS lockdown port 62078 probe (Probe A)
+                if (is_randomized or clean[:6] not in self.OUI_MAP) and self.check_apple_lockdown(ip):
+                    return "Apple iOS Device (Private MAC)" if is_randomized else "Apple iOS Device"
+
             # Evaluate locally administered / randomized MAC bit
-            if first_byte & 0x02:
+            if is_randomized:
                 return "Private/Randomized MAC"
 
             prefix = clean[:6]

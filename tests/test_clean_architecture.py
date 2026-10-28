@@ -29,7 +29,7 @@ class DummyResolver(HostnameResolverPort):
 
 
 class DummyManufacturerRepo(ManufacturerRepositoryPort):
-    def get_manufacturer(self, mac_address: str) -> str:
+    def get_manufacturer(self, mac_address: str, ip: str | None = None) -> str:
         if mac_address.startswith("CC:15:31"):
             return "Intel (Windows PC)"
         if mac_address.startswith("5C:9B:A6"):
@@ -105,6 +105,27 @@ class TestCleanArchitecture(unittest.TestCase):
         self.assertEqual(repo.get_manufacturer("ca:e4:3b:56:ce:62"), "Private/Randomized MAC")
         self.assertEqual(repo.get_manufacturer("5c:9b:a6:8b:9c:03"), "Apple")
         self.assertEqual(repo.get_manufacturer("cc:15:31:e5:bb:db"), "Intel (Windows PC)")
+
+    def test_probe_a_apple_lockdown_detection(self):
+        repo = HybridManufacturerRepository()
+        # Patch check_apple_lockdown to return True for simulated iPhone IP
+        repo.check_apple_lockdown = staticmethod(lambda ip, timeout=0.3: ip == "10.0.0.18")
+
+        # Randomized MAC on iPhone IP -> identifies as Apple iOS Device (Private MAC)
+        vendor = repo.get_manufacturer("82:11:02:26:fa:0f", ip="10.0.0.18")
+        self.assertEqual(vendor, "Apple iOS Device (Private MAC)")
+
+        # Other IP with randomized MAC -> remains Private/Randomized MAC
+        vendor_other = repo.get_manufacturer("82:11:02:26:fa:0f", ip="10.0.0.99")
+        self.assertEqual(vendor_other, "Private/Randomized MAC")
+
+    def test_probe_b_upnp_metadata_registration(self):
+        repo = HybridManufacturerRepository()
+        repo.register_device_metadata("10.0.0.119", "TCL", "Smart TV")
+
+        # Unknown or generic MAC resolves via UPnP descriptor
+        vendor = repo.get_manufacturer("AA:BB:CC:DD:EE:FF", ip="10.0.0.119")
+        self.assertEqual(vendor, "TCL (Smart TV)")
 
 
 if __name__ == "__main__":

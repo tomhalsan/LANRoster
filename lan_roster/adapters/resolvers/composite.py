@@ -51,3 +51,15 @@ class CompositeHostnameResolver(HostnameResolverPort):
 
         return final_map
 
+    def get_device_metadata(self, ip: str) -> Dict[str, str]:
+        """Retrieves discovered metadata from child resolvers."""
+        if hasattr(self.ssdp, "get_metadata"):
+            return self.ssdp.get_metadata(ip)
+        return {}
+
+    def get_all_metadata(self) -> Dict[str, Dict[str, str]]:
+        """Retrieves all discovered metadata from child resolvers."""
+        if hasattr(self.ssdp, "get_all_metadata"):
+            return self.ssdp.get_all_metadata()
+        return {}
+

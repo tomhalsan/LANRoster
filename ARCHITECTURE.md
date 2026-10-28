@@ -183,15 +183,17 @@ Adapters implement the port contracts to interact with specific infrastructure:
 - **[`ScapyArpScanner`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/scanner/scapy_arp.py)**: Crafts Layer 2 Ethernet broadcast frames containing ARP requests using Scapy's `srp`.
 - **[`CompositeHostnameResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/composite.py)**: Combines specialized resolvers using a priority cascade:
   $$\text{mDNS} \succ \text{NetBIOS} \succ \text{SSDP} \succ \text{DNS}$$
-  - [`SocketMDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/mdns.py): Sends unicast PTR queries to UDP port 5353 (`_services._dns-sd._udp.local`).
+  - [`SocketMDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/mdns.py): Sends unicast PTR queries to UDP port 5353 and parses both `PTR` (12) and `A` (1) records for advertised `.local` hosts.
   - [`SocketNetBIOSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/netbios.py): Sends NBNS node status queries (`*` wildcard name) to UDP port 137.
-  - [`SocketSSDPResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/ssdp.py): Issues unicast `M-SEARCH` requests to UDP port 1900 to discover UPnP friendly device names.
-  - [`SocketDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/dns.py): Queries local PTR records via `socket.gethostbyaddr`.
+  - [`SocketSSDPResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/ssdp.py): Issues multicast and targeted unicast `M-SEARCH` requests (UDP 1900) and concurrent HTTP fetches (**Probe B**) to parse UPnP XML device descriptions and Google Cast API (`/setup/eureka_info` on port 8008) for `<friendlyName>`, `<manufacturer>`, and `<modelName>`.
+  - [`SocketDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/dns.py): Queries local PTR records via `socket.gethostbyaddr` and issues direct DNS PTR queries to the local network gateway router (UDP port 53) to retrieve DHCP client hostnames (e.g. `iPhone-7544`).
 - **[`HybridManufacturerRepository`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/manufacturer/hybrid_repo.py)**:
-  1. Inspects the IEEE 802 locally-administered MAC address bit (bit 1 of first byte) to identify randomized private MAC addresses.
-  2. Queries an offline dictionary of common OUIs (Apple, Sony, Intel, Arris, Google, Samsung, etc.).
-  3. Consults an in-memory runtime cache.
-  4. Queries an external vendor API with timeout fallback.
+  1. Inspects active UPnP/SSDP metadata registered by Probe B.
+  2. Executes **Probe A (Apple Lockdown Check)**: Performs a sub-second TCP connect check on port 62078 (`apple-mobdev`/`iphone-sync`). If open, identifies the device as `Apple iOS Device (Private MAC)` or `Apple iOS Device`, cutting through randomized MAC addresses.
+  3. Inspects the IEEE 802 locally-administered MAC address bit (bit 1 of first byte) to flag `Private/Randomized MAC` addresses.
+  4. Queries an offline dictionary of common OUIs (Apple, Sony, Intel, Arris, Google, Samsung, etc.).
+  5. Consults an in-memory runtime cache.
+  6. Queries an external vendor API with timeout fallback.
 - **[`InMemoryDeviceRepository`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/repository/memory.py)**: Manages concurrent device updates safely via `threading.Lock`.
 - **[`SystemNetworkConfigAdapter`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/network/system_config.py)**: Inspects the OS routing table using `route -n get default` and `ifconfig` to automatically detect the local broadcast subnet.
 

@@ -22,6 +22,7 @@ def bootstrap():
     # 1. Secondary / Outbound Adapters
     network_config = SystemNetworkConfigAdapter()
     default_subnet = network_config.detect_default_subnet()
+    default_gateway = network_config.detect_default_gateway()
 
     device_repository = InMemoryDeviceRepository(initial_subnet=default_subnet)
     manufacturer_repository = HybridManufacturerRepository()
@@ -31,7 +32,7 @@ def bootstrap():
         mdns_resolver=SocketMDNSResolver(timeout=1.5),
         netbios_resolver=SocketNetBIOSResolver(timeout=0.4, max_workers=20),
         ssdp_resolver=SocketSSDPResolver(timeout=0.8),
-        dns_resolver=SocketDNSResolver(),
+        dns_resolver=SocketDNSResolver(gateway_ip=default_gateway),
     )
 
     # 2. Use Cases (Application Services)
