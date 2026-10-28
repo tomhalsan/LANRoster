@@ -21,6 +21,9 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
   - **UPnP / Cast Metadata Extraction (Probe B)**: Extracts manufacturer and model names directly from device XML/JSON descriptors.
   - Detects **Private / Randomized MAC** addresses used by modern mobile OS privacy features.
   - Flags firewalled Windows PCs so they can be easily identified even when in stealth mode.
+- **Smart Device Categorization & Visual Icons**:
+  - Automatically classifies nodes into 📱 **Mobile**, 💻 **Computer**, 📺 **Smart TV**, 🔊 **Smart Home / IoT**, 🖨️ **Printer**, 🌐 **Network Infrastructure**, 🎮 **Gaming Console**, and 📟 **Generic** using domain heuristics.
+  - Live category summary breakdown chips in the dashboard header.
 - **Dynamic Subnet Control**:
   - Automatically detects the host machine's active local subnet upon launch (e.g. `10.0.0.0/24`).
   - Allows entering custom subnets and CIDR blocks (e.g., `10.0.0.0/25`, `192.168.1.0/24`) directly from the web interface for instant rescanning.
@@ -147,6 +150,17 @@ Verify static typing with Pyrefly:
 ```bash
 pyrefly check
 ```
+
+---
+
+## Roadmap & Backlog
+
+See [TODO.md](TODO.md) for planned features including:
+- **Feature 2**: Device Presence Tracking (Online vs. Last Seen & New Device Alert)
+- **Feature 3**: Expandable Device Drawer & One-Click Port Shortcuts
+- **Feature 4**: Custom Device Nicknames & Notes (Persistent Aliases)
+- **Feature 5**: Wake-on-LAN (WoL) Integration
+- **Feature 6**: Real-Time Ping Latency & Connection Quality
 
 ---
 

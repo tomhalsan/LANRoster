@@ -13,6 +13,31 @@ class HostnameSource(str, Enum):
     UNKNOWN = ""
 
 
+class DeviceCategory(str, Enum):
+    MOBILE = "Mobile"
+    COMPUTER = "Computer"
+    SMART_TV = "Smart TV"
+    SMART_HOME = "Smart Home"
+    PRINTER = "Printer"
+    NETWORK = "Network"
+    GAMING = "Gaming"
+    GENERIC = "Generic"
+
+    @property
+    def icon(self) -> str:
+        icons = {
+            DeviceCategory.MOBILE: "📱",
+            DeviceCategory.COMPUTER: "💻",
+            DeviceCategory.SMART_TV: "📺",
+            DeviceCategory.SMART_HOME: "🔊",
+            DeviceCategory.PRINTER: "🖨️",
+            DeviceCategory.NETWORK: "🌐",
+            DeviceCategory.GAMING: "🎮",
+            DeviceCategory.GENERIC: "📟",
+        }
+        return icons.get(self, "📟")
+
+
 @dataclass
 class Device:
     ip: str
@@ -21,6 +46,7 @@ class Device:
     source: HostnameSource = HostnameSource.UNKNOWN
     vendor: str = "Generic Device"
     last_seen: str = ""
+    category: DeviceCategory = DeviceCategory.GENERIC
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -29,6 +55,8 @@ class Device:
             "source": self.source.value,
             "vendor": self.vendor,
             "last_seen": self.last_seen,
+            "category": self.category.value,
+            "category_icon": self.category.icon,
         }
 
 
@@ -48,4 +76,3 @@ class ScanState:
             "error_message": self.error_message,
             "total_found": self.total_found,
         }
-

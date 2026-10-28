@@ -2,7 +2,8 @@ import threading
 import unittest
 from typing import Dict, List, Tuple
 
-from lan_roster.domain.models import Device, HostnameSource, ScanState
+from lan_roster.domain.models import Device, DeviceCategory, HostnameSource, ScanState
+from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import (
     LANRosterException,
     InvalidSubnetException,
@@ -86,12 +87,64 @@ class TestDomainLayer(unittest.TestCase):
             source=HostnameSource.DNS,
             vendor="Apple iOS Device (Private MAC)",
             last_seen="12:00:00",
+            category=DeviceCategory.MOBILE,
         )
         data = dev.to_dict()
         self.assertEqual(data["mac"], "82:11:02:26:FA:0F")
         self.assertEqual(data["hostname"], "iPhone-7544")
         self.assertEqual(data["source"], "DNS")
         self.assertEqual(data["vendor"], "Apple iOS Device (Private MAC)")
+        self.assertEqual(data["category"], "Mobile")
+        self.assertEqual(data["category_icon"], "📱")
+
+    def test_device_classifier_all_categories(self):
+        # 1. Network
+        cat = DeviceClassifier.classify(ip="10.0.0.1", vendor="ARRIS Group, Inc.")
+        self.assertEqual(cat, DeviceCategory.NETWORK)
+        self.assertEqual(cat.icon, "🌐")
+
+        # 2. Mobile
+        cat = DeviceClassifier.classify(ip="10.0.0.18", hostname="Badunkadunk", vendor="Apple, Inc. (iOS)")
+        self.assertEqual(cat, DeviceCategory.MOBILE)
+        self.assertEqual(cat.icon, "📱")
+
+        # 3. Computer
+        cat = DeviceClassifier.classify(ip="10.0.0.139", hostname="PAPPA-CPPC", source=HostnameSource.NETBIOS)
+        self.assertEqual(cat, DeviceCategory.COMPUTER)
+        cat_mac = DeviceClassifier.classify(ip="10.0.0.28", hostname="Tom's MacBook Pro", vendor="Apple, Inc.")
+        self.assertEqual(cat_mac, DeviceCategory.COMPUTER)
+        self.assertEqual(cat.icon, "💻")
+
+        # 4. Smart TV
+        cat = DeviceClassifier.classify(ip="10.0.0.45", hostname="Living-Room-Apple-TV", vendor="Apple, Inc.")
+        self.assertEqual(cat, DeviceCategory.SMART_TV)
+        cat_cast = DeviceClassifier.classify(ip="10.0.0.46", hostname="Chromecast", vendor="Google Cast")
+        self.assertEqual(cat_cast, DeviceCategory.SMART_TV)
+        self.assertEqual(cat.icon, "📺")
+
+        # 5. Smart Home / Audio
+        cat = DeviceClassifier.classify(ip="10.0.0.70", hostname="Sonos-Beam", vendor="Sonos, Inc.")
+        self.assertEqual(cat, DeviceCategory.SMART_HOME)
+        cat_iot = DeviceClassifier.classify(ip="10.0.0.71", hostname="Smart-Plug", vendor="Espressif Inc.")
+        self.assertEqual(cat_iot, DeviceCategory.SMART_HOME)
+        self.assertEqual(cat.icon, "🔊")
+
+        # 6. Printer
+        cat = DeviceClassifier.classify(ip="10.0.0.60", hostname="HP-LaserJet-Pro", vendor="HP Inc.")
+        self.assertEqual(cat, DeviceCategory.PRINTER)
+        cat_epson = DeviceClassifier.classify(ip="10.0.0.61", vendor="Brother Industries")
+        self.assertEqual(cat_epson, DeviceCategory.PRINTER)
+        self.assertEqual(cat.icon, "🖨️")
+
+        # 7. Gaming
+        cat = DeviceClassifier.classify(ip="10.0.0.80", hostname="PlayStation-5", vendor="Sony Interactive")
+        self.assertEqual(cat, DeviceCategory.GAMING)
+        self.assertEqual(cat.icon, "🎮")
+
+        # 8. Generic / Unknown
+        cat = DeviceClassifier.classify(ip="10.0.0.99", hostname="Unknown", vendor="Generic Device")
+        self.assertEqual(cat, DeviceCategory.GENERIC)
+        self.assertEqual(cat.icon, "📟")
 
     def test_scan_state_to_dict(self):
         state = ScanState(subnet="10.0.0.0/24", is_scanning=True, total_found=5)
@@ -153,6 +206,7 @@ class TestUseCasesLayer(unittest.TestCase):
         win_dev = next(d for d in devices if d.ip == "10.0.0.139")
         self.assertEqual(win_dev.source, HostnameSource.FIREWALLED)
         self.assertEqual(win_dev.vendor, "Intel (Windows PC)")
+        self.assertEqual(win_dev.category, DeviceCategory.COMPUTER)
 
     def test_scan_network_syncs_upnp_metadata(self):
         nodes = [("10.0.0.119", "AA:BB:CC:DD:EE:FF")]
@@ -172,6 +226,7 @@ class TestUseCasesLayer(unittest.TestCase):
         devices = use_case.execute()
         self.assertEqual(len(devices), 1)
         self.assertEqual(devices[0].vendor, "TCL (Smart TV)")
+        self.assertEqual(devices[0].category, DeviceCategory.SMART_TV)
 
     def test_scan_network_failure_handling(self):
         scanner = DummyScanner(raise_error=True)
@@ -307,11 +362,13 @@ class TestAdaptersLayer(unittest.TestCase):
             source=HostnameSource.MDNS,
             vendor="Apple iOS Device (Private MAC)",
             last_seen="01:00:00",
+            category=DeviceCategory.MOBILE,
         )
         repo.save_devices([dev1])
         self.assertEqual(repo.get_devices()["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertEqual(repo.get_devices()["10.0.0.18"].category, DeviceCategory.MOBILE)
 
-        # Pass 2: Phone screen locked, returns Unknown hostname & Private MAC
+        # Pass 2: Phone screen locked, returns Unknown hostname & Private MAC & Generic
         dev2 = Device(
             ip="10.0.0.18",
             mac="82:11:02:26:FA:0F",
@@ -319,13 +376,15 @@ class TestAdaptersLayer(unittest.TestCase):
             source=HostnameSource.UNKNOWN,
             vendor="Private/Randomized MAC",
             last_seen="01:00:30",
+            category=DeviceCategory.GENERIC,
         )
         repo.save_devices([dev2])
 
-        # Roster MUST retain Badunkadunk and Apple iOS Device!
+        # Roster MUST retain Badunkadunk, Apple iOS Device, and Mobile category!
         retained = repo.get_devices()["10.0.0.18"]
         self.assertEqual(retained.hostname, "Badunkadunk")
         self.assertEqual(retained.vendor, "Apple iOS Device (Private MAC)")
+        self.assertEqual(retained.category, DeviceCategory.MOBILE)
         self.assertEqual(retained.last_seen, "01:00:30")
 
         # Pass 3: Phone Wi-Fi in DTIM sleep during 2-second sweep window (misses ARP)
@@ -368,6 +427,8 @@ class TestPresentationLayer(unittest.TestCase):
         json_data = resp.get_json()
         self.assertIn("10.0.0.18", json_data["devices"])
         self.assertEqual(json_data["devices"]["10.0.0.18"]["hostname"], "iPhone-7544")
+        self.assertIn("category", json_data["devices"]["10.0.0.18"])
+        self.assertIn("category_icon", json_data["devices"]["10.0.0.18"])
         self.assertEqual(json_data["state"]["subnet"], "10.0.0.0/24")
 
     def test_api_set_subnet_valid(self):
