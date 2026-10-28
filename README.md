@@ -88,6 +88,55 @@ If Windows computers show up with their hostname as `Unknown` and a `Windows (Fi
 
 ---
 
+## Clean Architecture Structure
+
+LANRoster adheres to the Clean Architecture (Hexagonal / Ports and Adapters) methodology:
+
+```text
+lan_roster/
+├── domain/                      # Enterprise Business Rules (zero external dependencies)
+│   ├── models.py                # Device, ScanState, HostnameSource entities
+│   └── exceptions.py            # Domain exceptions (InvalidSubnetException, etc.)
+├── ports/                       # Contract Interfaces (Abstract Base Classes)
+│   ├── scanner.py               # NetworkScannerPort
+│   ├── resolver.py              # HostnameResolverPort
+│   ├── manufacturer.py          # ManufacturerRepositoryPort (Isolated OUI/vendor interface)
+│   ├── repository.py            # DeviceRepositoryPort
+│   └── network_config.py        # NetworkConfigPort
+├── use_cases/                   # Application Business Rules (Workflows)
+│   ├── scan_network.py          # ScanNetworkUseCase
+│   ├── get_devices.py           # GetDevicesUseCase
+│   └── update_subnet.py         # UpdateSubnetUseCase
+├── adapters/                    # Interface Adapters (Frameworks & Drivers)
+│   ├── scanner/scapy_arp.py     # Scapy ARP packet sweeper
+│   ├── resolvers/               # Socket mDNS, NetBIOS, SSDP, & DNS adapters
+│   ├── manufacturer/            # Hybrid OUI dictionary + online cache adapter
+│   ├── repository/memory.py     # Thread-safe in-memory device repository
+│   └── network/system_config.py # macOS/Linux route and ifconfig adapter
+└── ui/                          # Presentation Layer
+    ├── web.py                   # Flask controller & API routes
+    └── templates.py             # Pure HTML/CSS/JS presentation templates
+
+app.py                           # Composition Root: Dependency Injection & bootstrap
+tests/                           # Isolated unit tests with mock ports
+```
+
+---
+
+## Running Tests
+
+Run the unit test suite without needing root privileges or network hardware:
+```bash
+python3 -m unittest discover tests
+```
+
+Verify static typing with Pyrefly:
+```bash
+pyrefly check
+```
+
+---
+
 ## License
 
 MIT License.
