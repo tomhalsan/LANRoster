@@ -57,3 +57,4 @@ This document tracks upcoming planned features and architectural enhancements fo
   - `adapters/latency/socket_ping.py`: Multi-threaded TCP/ICMP ping prober.
   - `domain/models.py`: Store `latency_ms: float | None`.
   - `ui/templates.py`: Add latency badge column with color-coding.
+
