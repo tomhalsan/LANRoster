@@ -44,7 +44,7 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
 
 ```bash
 git clone <repository-url>
-cd net-scanner
+cd LANRoster
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -57,7 +57,7 @@ Because Scapy crafts Layer 2 Ethernet ARP packets, execute the server with root 
 ```bash
 sudo .venv/bin/python app.py
 ```
-*(or `sudo python3 app.py`)*
+*(or via package execution: `sudo .venv/bin/python -m lan_roster`)*
 
 ### 3. Open the Dashboard
 
@@ -90,7 +90,15 @@ If Windows computers show up with their hostname as `Unknown` and a `Windows (Fi
 
 ## Clean Architecture Structure
 
-LANRoster adheres to the Clean Architecture (Hexagonal / Ports and Adapters) methodology:
+LANRoster is engineered following the **Clean Architecture** (Hexagonal / Ports and Adapters) methodology:
+
+- **Enterprise Business Rules (Domain)** have zero third-party dependencies.
+- **Application Business Rules (Use Cases)** orchestrate workflows and communicate exclusively through Port interfaces.
+- **Interface Adapters** bridge external systems (Scapy, raw sockets, OS commands, Flask) to domain contracts.
+- **Dependency Rule**: Source code dependencies point strictly inward toward the domain core.
+- **Testability**: The entire business logic can be tested without root (`sudo`) privileges or live network packets.
+
+For a detailed walkthrough, sequence flows, and design diagrams, consult [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```text
 lan_roster/
@@ -100,24 +108,26 @@ lan_roster/
 ├── ports/                       # Contract Interfaces (Abstract Base Classes)
 │   ├── scanner.py               # NetworkScannerPort
 │   ├── resolver.py              # HostnameResolverPort
-│   ├── manufacturer.py          # ManufacturerRepositoryPort (Isolated OUI/vendor interface)
+│   ├── manufacturer.py          # ManufacturerRepositoryPort
 │   ├── repository.py            # DeviceRepositoryPort
 │   └── network_config.py        # NetworkConfigPort
 ├── use_cases/                   # Application Business Rules (Workflows)
-│   ├── scan_network.py          # ScanNetworkUseCase
-│   ├── get_devices.py           # GetDevicesUseCase
-│   └── update_subnet.py         # UpdateSubnetUseCase
-├── adapters/                    # Interface Adapters (Frameworks & Drivers)
+│   ├── scan_network.py          # ScanNetworkUseCase (orchestration & firewall heuristics)
+│   ├── get_devices.py           # GetDevicesUseCase (retrieval & numeric IP sorting)
+│   └── update_subnet.py         # UpdateSubnetUseCase (CIDR validation & state management)
+├── adapters/                    # Interface Adapters (Secondary / Driven)
 │   ├── scanner/scapy_arp.py     # Scapy ARP packet sweeper
 │   ├── resolvers/               # Socket mDNS, NetBIOS, SSDP, & DNS adapters
 │   ├── manufacturer/            # Hybrid OUI dictionary + online cache adapter
 │   ├── repository/memory.py     # Thread-safe in-memory device repository
 │   └── network/system_config.py # macOS/Linux route and ifconfig adapter
-└── ui/                          # Presentation Layer
-    ├── web.py                   # Flask controller & API routes
-    └── templates.py             # Pure HTML/CSS/JS presentation templates
+├── ui/                          # Presentation Layer (Primary / Driving Adapter)
+│   ├── web.py                   # Flask controller & API routes
+│   └── templates.py             # Responsive HTML/CSS/JS dashboard
+├── bootstrap.py                 # Composition Root: Dependency Injection & background worker
+└── __main__.py                  # Package execution entry point (`python -m lan_roster`)
 
-app.py                           # Composition Root: Dependency Injection & bootstrap
+app.py                           # Root runner maintaining backwards compatibility
 tests/                           # Isolated unit tests with mock ports
 ```
 
@@ -139,5 +149,5 @@ pyrefly check
 
 ## License
 
-MIT License.
+This project is licensed under the **GNU General Public License v2.0 (GPL-2.0)**. See the [LICENSE](LICENSE) file for the full license text.
 
