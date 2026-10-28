@@ -19,6 +19,10 @@ class UpdateSubnetUseCase:
         try:
             network = ipaddress.ip_network(clean_subnet, strict=False)
             normalized = str(network)
+            current_state = self.device_repo.get_scan_state()
+            if current_state.subnet != normalized:
+                self.device_repo.clear_devices()
+
             self.device_repo.update_scan_state(
                 subnet=normalized,
                 error_message=None,
