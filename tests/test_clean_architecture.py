@@ -14,6 +14,8 @@ from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
+from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
+from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
@@ -236,14 +238,19 @@ class TestAdaptersLayer(unittest.TestCase):
             "10.0.0.3": ("ssdp-name-3", HostnameSource.SSDP),
         })
         dns = DummyResolver({"10.0.0.4": ("dns-name", HostnameSource.DNS)})
+        http = DummyResolver({
+            "10.0.0.4": ("http-ignored", HostnameSource.HTTP),
+            "10.0.0.5": ("IP Camera Web Admin", HostnameSource.HTTP),
+        })
 
         composite = CompositeHostnameResolver(
             mdns_resolver=mdns,
             netbios_resolver=netbios,
             ssdp_resolver=ssdp,
             dns_resolver=dns,
+            http_resolver=http,
         )
-        res = composite.resolve_batch(["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"])
+        res = composite.resolve_batch(["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4", "10.0.0.5"])
 
         # 10.0.0.1: mDNS beats NetBIOS
         self.assertEqual(res["10.0.0.1"], ("mdns-name", HostnameSource.MDNS))
@@ -251,8 +258,24 @@ class TestAdaptersLayer(unittest.TestCase):
         self.assertEqual(res["10.0.0.2"], ("nbns-name-2", HostnameSource.NETBIOS))
         # 10.0.0.3: SSDP fallback
         self.assertEqual(res["10.0.0.3"], ("ssdp-name-3", HostnameSource.SSDP))
-        # 10.0.0.4: DNS fallback
+        # 10.0.0.4: DNS beats HTTP
         self.assertEqual(res["10.0.0.4"], ("dns-name", HostnameSource.DNS))
+        # 10.0.0.5: HTTP fallback (Probe D)
+        self.assertEqual(res["10.0.0.5"], ("IP Camera Web Admin", HostnameSource.HTTP))
+
+    def test_probe_c_human_name_filtering(self):
+        # Valid names pass
+        self.assertTrue(SocketMDNSResolver._is_clean_human_name("Tom’s MBP"))
+        self.assertTrue(SocketMDNSResolver._is_clean_human_name("Badunkadunk"))
+        self.assertTrue(SocketMDNSResolver._is_clean_human_name("Kayla’s MacBook Pro"))
+        # Raw UUIDs and device hashes are filtered
+        self.assertFalse(SocketMDNSResolver._is_clean_human_name("e7ac5f06-e7ef-290a-b33b-36638a5c8af9"))
+        self.assertFalse(SocketMDNSResolver._is_clean_human_name("V505M-K09-4d628ccfea58bdc57e374f16b1840b88"))
+
+    def test_probe_d_http_banner_generic_filtering(self):
+        resolver = SocketHTTPBannerResolver()
+        self.assertIn("login", resolver.GENERIC_TITLES)
+        self.assertIn("404 not found", resolver.GENERIC_TITLES)
 
     def test_in_memory_repository_thread_safety(self):
         repo = InMemoryDeviceRepository()

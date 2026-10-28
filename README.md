@@ -10,14 +10,15 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
 
 - **Layer 2 ARP Discovery**: Rapidly discovers all active IPv4 devices on the broadcast domain using Scapy.
 - **Multi-Protocol Hostname Resolution**:
-  - **mDNS / Bonjour (UDP 5353)**: Discovers macOS, iOS, Android, Apple TV, PlayStation, Smart TV, and IoT hostnames (`.local`), parsing both PTR and A record announcements.
+  - **mDNS / Bonjour (UDP 5353, Probes C & E)**: Discovers macOS, iOS, Android, Apple TV, PlayStation, Smart TV, and IoT hostnames (`.local`), parsing PTR, A records, Apple Continuity (`_companion-link`), AirPlay, and Bonjour Sleep Proxy (`_sleep-proxy`).
   - **NetBIOS Name Service (NBNS, UDP 137)**: Concurrently queries Windows computers and Samba shares for their NetBIOS computer names.
-  - **SSDP / UPnP & Google Cast (UDP 1900 / TCP 8008)**: Discovers friendly device names, manufacturers, and model descriptions for Smart TVs, media renderers, and Google Cast/Chromecast devices.
+  - **SSDP / UPnP & Google Cast (UDP 1900 / TCP 8008, Probe B)**: Discovers friendly device names, manufacturers, and model descriptions for Smart TVs, media renderers, and Google Cast/Chromecast devices.
   - **Unicast & Gateway Reverse DNS**: Queries local resolver and sends direct PTR queries to the network gateway router (UDP 53) to discover DHCP client names (e.g. `iPhone-7544`).
+  - **HTTP Banner & Title Inspection (Probe D)**: Probes ports 80/8080 for web-managed appliances, IP cameras, printers, and routers.
 - **Hardware & Vendor Fingerprinting**:
   - Recognizes hardware manufacturers (Apple, Sony PlayStation, Intel, Arris/Comcast Gateways, Amazon, Google, TP-Link, Samsung, TCL, Vizio, etc.).
-  - **Apple Lockdown Probe**: Fingerprints Apple iOS / iPadOS devices via port 62078 (`apple-mobdev`), identifying iPhones even when using **Private / Randomized MAC** addresses.
-  - **UPnP / Cast Metadata Extraction**: Extracts manufacturer and model names directly from device XML/JSON descriptors.
+  - **Apple Lockdown Probe (Probe A)**: Fingerprints Apple iOS / iPadOS devices via port 62078 (`apple-mobdev`), identifying iPhones even when using **Private / Randomized MAC** addresses.
+  - **UPnP / Cast Metadata Extraction (Probe B)**: Extracts manufacturer and model names directly from device XML/JSON descriptors.
   - Detects **Private / Randomized MAC** addresses used by modern mobile OS privacy features.
   - Flags firewalled Windows PCs so they can be easily identified even when in stealth mode.
 - **Dynamic Subnet Control**:
@@ -25,7 +26,7 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
   - Allows entering custom subnets and CIDR blocks (e.g., `10.0.0.0/25`, `192.168.1.0/24`) directly from the web interface for instant rescanning.
 - **Modern Live Dashboard**:
   - In-place auto-refreshing UI (polls every 5 seconds without wiping input focus).
-  - Protocol source badges (`mDNS`, `NetBIOS`, `SSDP`, `DNS`, `Windows (Firewalled)`).
+  - Protocol source badges (`mDNS`, `NetBIOS`, `SSDP`, `DNS`, `HTTP`, `Windows (Firewalled)`).
   - Built-in guidance for configuring Windows network discovery.
 - **JSON REST API**:
   - `GET /api/devices`: Returns active device registry and scan state.
@@ -119,7 +120,7 @@ lan_roster/
 │   └── update_subnet.py         # UpdateSubnetUseCase (CIDR validation & state management)
 ├── adapters/                    # Interface Adapters (Secondary / Driven)
 │   ├── scanner/scapy_arp.py     # Scapy ARP packet sweeper
-│   ├── resolvers/               # Socket mDNS, NetBIOS, SSDP, & DNS adapters
+│   ├── resolvers/               # Socket mDNS, NetBIOS, SSDP, DNS, & HTTP banner adapters
 │   ├── manufacturer/            # Hybrid OUI dictionary + online cache adapter
 │   ├── repository/memory.py     # Thread-safe in-memory device repository
 │   └── network/system_config.py # macOS/Linux route and ifconfig adapter

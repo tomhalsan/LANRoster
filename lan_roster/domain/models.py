@@ -8,6 +8,7 @@ class HostnameSource(str, Enum):
     NETBIOS = "NetBIOS"
     SSDP = "SSDP"
     DNS = "DNS"
+    HTTP = "HTTP"
     FIREWALLED = "Firewalled"
     UNKNOWN = ""
 

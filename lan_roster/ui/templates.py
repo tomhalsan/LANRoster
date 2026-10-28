@@ -202,6 +202,7 @@ HTML_DASHBOARD_TEMPLATE = """
         .badge-netbios { background: #e0f2fe; color: var(--blue); }
         .badge-ssdp { background: #ffedd5; color: var(--orange); }
         .badge-dns { background: #dcfce7; color: var(--success); }
+        .badge-http { background: #e0e7ff; color: #4338ca; }
         .badge-firewalled { background: #fef3c7; color: #b45309; }
         .vendor {
             font-size: 0.88rem;

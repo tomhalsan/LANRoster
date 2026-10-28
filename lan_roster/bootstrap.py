@@ -5,6 +5,7 @@ from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
 from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
 from lan_roster.adapters.resolvers.dns import SocketDNSResolver
+from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
@@ -33,6 +34,7 @@ def bootstrap():
         netbios_resolver=SocketNetBIOSResolver(timeout=0.4, max_workers=20),
         ssdp_resolver=SocketSSDPResolver(timeout=0.8),
         dns_resolver=SocketDNSResolver(gateway_ip=default_gateway),
+        http_resolver=SocketHTTPBannerResolver(timeout=0.5),
     )
 
     # 2. Use Cases (Application Services)

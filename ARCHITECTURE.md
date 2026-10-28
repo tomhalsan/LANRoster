@@ -182,11 +182,12 @@ Adapters implement the port contracts to interact with specific infrastructure:
 
 - **[`ScapyArpScanner`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/scanner/scapy_arp.py)**: Crafts Layer 2 Ethernet broadcast frames containing ARP requests using Scapy's `srp`.
 - **[`CompositeHostnameResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/composite.py)**: Combines specialized resolvers using a priority cascade:
-  $$\text{mDNS} \succ \text{NetBIOS} \succ \text{SSDP} \succ \text{DNS}$$
-  - [`SocketMDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/mdns.py): Sends unicast PTR queries to UDP port 5353 and parses both `PTR` (12) and `A` (1) records for advertised `.local` hosts.
+  $$\text{mDNS} \succ \text{NetBIOS} \succ \text{SSDP} \succ \text{DNS} \succ \text{HTTP}$$
+  - [`SocketMDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/mdns.py): Sends unicast PTR queries, service queries (**Probe C** for `_companion-link`, `_airplay`, `_googlecast`, `_ipp`), and Bonjour Sleep Proxy queries (**Probe E** for `_sleep-proxy`) over UDP 5353, extracting clean instance names (e.g. `Badunkadunk`, `Tom’s MBP`) and parsing `A` records.
   - [`SocketNetBIOSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/netbios.py): Sends NBNS node status queries (`*` wildcard name) to UDP port 137.
   - [`SocketSSDPResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/ssdp.py): Issues multicast and targeted unicast `M-SEARCH` requests (UDP 1900) and concurrent HTTP fetches (**Probe B**) to parse UPnP XML device descriptions and Google Cast API (`/setup/eureka_info` on port 8008) for `<friendlyName>`, `<manufacturer>`, and `<modelName>`.
   - [`SocketDNSResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/dns.py): Queries local PTR records via `socket.gethostbyaddr` and issues direct DNS PTR queries to the local network gateway router (UDP port 53) to retrieve DHCP client hostnames (e.g. `iPhone-7544`).
+  - [`SocketHTTPBannerResolver`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/resolvers/http_banner.py): Concurrently probes HTTP ports 80/8080 (**Probe D**) to extract web administration page titles and server banners for cameras, switches, and routers.
 - **[`HybridManufacturerRepository`](file:///Users/tomhalsan/dev/LANRoster/lan_roster/adapters/manufacturer/hybrid_repo.py)**:
   1. Inspects active UPnP/SSDP metadata registered by Probe B.
   2. Executes **Probe A (Apple Lockdown Check)**: Performs a sub-second TCP connect check on port 62078 (`apple-mobdev`/`iphone-sync`). If open, identifies the device as `Apple iOS Device (Private MAC)` or `Apple iOS Device`, cutting through randomized MAC addresses.

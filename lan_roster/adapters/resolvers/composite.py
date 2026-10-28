@@ -15,11 +15,13 @@ class CompositeHostnameResolver(HostnameResolverPort):
         netbios_resolver: HostnameResolverPort,
         ssdp_resolver: HostnameResolverPort,
         dns_resolver: HostnameResolverPort,
+        http_resolver: HostnameResolverPort | None = None,
     ) -> None:
         self.mdns = mdns_resolver
         self.netbios = netbios_resolver
         self.ssdp = ssdp_resolver
         self.dns = dns_resolver
+        self.http = http_resolver
 
     def resolve_batch(self, ips: List[str]) -> Dict[str, Tuple[str, HostnameSource]]:
         if not ips:
@@ -34,8 +36,11 @@ class CompositeHostnameResolver(HostnameResolverPort):
         # 3. NetBIOS queries (covers Windows PC names, Samba shares)
         netbios_results = self.netbios.resolve_batch(ips)
 
-        # 4. Unicast reverse DNS fallback
+        # 4. Unicast reverse DNS fallback (including Gateway router DHCP)
         dns_results = self.dns.resolve_batch(ips)
+
+        # 5. HTTP Banner & Title probe (Probe D)
+        http_results = self.http.resolve_batch(ips) if self.http else {}
 
         # Synthesize in priority order
         final_map: Dict[str, Tuple[str, HostnameSource]] = {}
@@ -48,18 +53,28 @@ class CompositeHostnameResolver(HostnameResolverPort):
                 final_map[ip] = ssdp_results[ip]
             elif ip in dns_results:
                 final_map[ip] = dns_results[ip]
+            elif ip in http_results:
+                final_map[ip] = http_results[ip]
 
         return final_map
 
     def get_device_metadata(self, ip: str) -> Dict[str, str]:
         """Retrieves discovered metadata from child resolvers."""
+        data: Dict[str, str] = {}
         if hasattr(self.ssdp, "get_metadata"):
-            return self.ssdp.get_metadata(ip)
-        return {}
+            data.update(self.ssdp.get_metadata(ip))
+        if self.http and hasattr(self.http, "get_metadata"):
+            data.update(self.http.get_metadata(ip))
+        return data
 
     def get_all_metadata(self) -> Dict[str, Dict[str, str]]:
         """Retrieves all discovered metadata from child resolvers."""
+        combined: Dict[str, Dict[str, str]] = {}
         if hasattr(self.ssdp, "get_all_metadata"):
-            return self.ssdp.get_all_metadata()
-        return {}
+            for ip, m in self.ssdp.get_all_metadata().items():
+                combined.setdefault(ip, {}).update(m)
+        if self.http and hasattr(self.http, "get_all_metadata"):
+            for ip, m in self.http.get_all_metadata().items():
+                combined.setdefault(ip, {}).update(m)
+        return combined
 
