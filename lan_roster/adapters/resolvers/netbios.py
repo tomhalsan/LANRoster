@@ -70,3 +70,4 @@ class SocketNetBIOSResolver(HostnameResolverPort):
                     pass
 
         return results
+

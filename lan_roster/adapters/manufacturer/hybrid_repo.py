@@ -149,3 +149,4 @@ class HybridManufacturerRepository(ManufacturerRepositoryPort):
                 self._cache[prefix] = "Generic Device"
 
         return "Generic Device"
+

@@ -61,3 +61,4 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                 error_message=self._state.error_message,
                 total_found=self._state.total_found,
             )
+

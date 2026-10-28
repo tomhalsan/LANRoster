@@ -32,3 +32,4 @@ class DeviceRepositoryPort(ABC):
     ) -> ScanState:
         """Updates specific fields of the current scanner state."""
         pass
+

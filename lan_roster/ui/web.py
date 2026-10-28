@@ -61,3 +61,4 @@ def create_web_app(
             return jsonify({"error": str(e)}), 400
 
     return app
+

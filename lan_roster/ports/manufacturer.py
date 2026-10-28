@@ -11,3 +11,4 @@ class ManufacturerRepositoryPort(ABC):
         Returns a descriptive string (e.g. 'Apple', 'Intel (Windows PC)').
         """
         pass
+

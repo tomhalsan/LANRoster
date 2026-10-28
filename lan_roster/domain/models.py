@@ -47,3 +47,4 @@ class ScanState:
             "error_message": self.error_message,
             "total_found": self.total_found,
         }
+

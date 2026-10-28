@@ -15,3 +15,4 @@ class HostnameResolverPort(ABC):
         Returns a mapping of {ip: (hostname, source)}.
         """
         pass
+

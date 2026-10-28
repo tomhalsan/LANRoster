@@ -50,3 +50,4 @@ class CompositeHostnameResolver(HostnameResolverPort):
                 final_map[ip] = dns_results[ip]
 
         return final_map
+

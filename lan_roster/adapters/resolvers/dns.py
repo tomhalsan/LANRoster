@@ -17,3 +17,4 @@ class SocketDNSResolver(HostnameResolverPort):
             except Exception:
                 pass
         return results
+

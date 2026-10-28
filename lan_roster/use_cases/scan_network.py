@@ -78,3 +78,4 @@ class ScanNetworkUseCase:
                 error_message=str(e),
             )
             raise ScanExecutionException(f"Failed to complete network scan: {e}") from e
+

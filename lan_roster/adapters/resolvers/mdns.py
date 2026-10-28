@@ -108,3 +108,4 @@ class SocketMDNSResolver(HostnameResolverPort):
             pass
 
         return results
+

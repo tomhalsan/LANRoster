@@ -11,3 +11,4 @@ class InvalidSubnetException(LANRosterException):
 class ScanExecutionException(LANRosterException):
     """Raised when an underlying network scan fails."""
     pass
+

@@ -11,3 +11,4 @@ class NetworkConfigPort(ABC):
         Returns a CIDR string such as '10.0.0.0/24'.
         """
         pass
+

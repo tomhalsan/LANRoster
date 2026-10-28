@@ -38,3 +38,4 @@ class SystemNetworkConfigAdapter(NetworkConfigPort):
             pass
 
         return self.fallback_subnet
+

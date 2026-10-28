@@ -24,3 +24,4 @@ class ScapyArpScanner(NetworkScannerPort):
             discovered.append((ip, mac))
 
         return discovered
+

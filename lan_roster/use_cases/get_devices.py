@@ -22,3 +22,4 @@ class GetDevicesUseCase:
 
         sorted_devices = dict(sorted(devices.items(), key=ip_sort_key))
         return sorted_devices, state
+

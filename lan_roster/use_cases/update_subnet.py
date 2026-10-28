@@ -28,3 +28,4 @@ class UpdateSubnetUseCase:
             err = f"Invalid subnet CIDR format: '{raw_subnet}'. Please use format like 10.0.0.0/24 or 10.0.0.0/25."
             self.device_repo.update_scan_state(error_message=err)
             raise InvalidSubnetException(err) from e
+

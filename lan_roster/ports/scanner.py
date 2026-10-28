@@ -12,3 +12,4 @@ class NetworkScannerPort(ABC):
         Returns a list of discovered (ip, mac) tuples.
         """
         pass
+
