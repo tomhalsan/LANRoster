@@ -6,8 +6,10 @@ import struct
 import subprocess
 import threading
 import time
+from typing import Any, Dict
 from flask import Flask, jsonify, render_template_string, request, redirect, url_for
-from scapy.all import ARP, Ether, srp
+from scapy.layers.l2 import ARP, Ether
+from scapy.sendrecv import srp
 
 app = Flask(__name__)
 
@@ -155,7 +157,7 @@ def detect_default_subnet():
     return "10.0.0.0/24"
 
 # Global scan status state
-scan_state = {
+scan_state: Dict[str, Any] = {
     "subnet": detect_default_subnet(),
     "scanning": False,
     "last_scan_time": "Never",
