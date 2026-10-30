@@ -78,17 +78,24 @@ class ScanNetworkUseCase:
                         source=source,
                         vendor=vendor,
                         last_seen=current_time,
+                        first_seen=current_time,
                         category=category,
+                        is_online=True,
                     )
                 )
 
-            # 4. Persist and merge updated roster
+            # 4. Persist and merge updated roster with presence tracking
             self.device_repo.save_devices(device_entities)
             all_devices = self.device_repo.get_devices()
+            online_count = sum(1 for d in all_devices.values() if d.is_online)
+            offline_count = len(all_devices) - online_count
+
             self.device_repo.update_scan_state(
                 is_scanning=False,
                 last_scan_time=current_time,
                 total_found=len(all_devices),
+                online_count=online_count,
+                offline_count=offline_count,
             )
             return list(all_devices.values())
 

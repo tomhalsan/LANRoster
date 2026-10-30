@@ -94,12 +94,15 @@ class TestDomainLayer(unittest.TestCase):
             category=DeviceCategory.MOBILE,
         )
         data = dev.to_dict()
+        self.assertEqual(data["ip"], "10.0.0.18")
         self.assertEqual(data["mac"], "82:11:02:26:FA:0F")
         self.assertEqual(data["hostname"], "iPhone-7544")
         self.assertEqual(data["source"], "DNS")
         self.assertEqual(data["vendor"], "Apple iOS Device (Private MAC)")
         self.assertEqual(data["category"], "Mobile")
         self.assertEqual(data["category_icon"], "📱")
+        self.assertTrue(data["is_online"])
+        self.assertFalse(data["is_new"])
 
     def test_device_classifier_all_categories(self):
         # 1. Network
@@ -151,11 +154,19 @@ class TestDomainLayer(unittest.TestCase):
         self.assertEqual(cat.icon, "📟")
 
     def test_scan_state_to_dict(self):
-        state = ScanState(subnet="10.0.0.0/24", is_scanning=True, total_found=5)
+        state = ScanState(
+            subnet="10.0.0.0/24",
+            is_scanning=True,
+            total_found=5,
+            online_count=4,
+            offline_count=1,
+        )
         data = state.to_dict()
         self.assertEqual(data["subnet"], "10.0.0.0/24")
         self.assertTrue(data["scanning"])
         self.assertEqual(data["total_found"], 5)
+        self.assertEqual(data["online_count"], 4)
+        self.assertEqual(data["offline_count"], 1)
 
     def test_domain_exception_hierarchy(self):
         self.assertTrue(issubclass(InvalidSubnetException, LANRosterException))
@@ -552,6 +563,10 @@ class TestAdaptersLayer(unittest.TestCase):
         # Phone is NOT wiped out!
         self.assertIn("10.0.0.18", repo.get_devices())
         self.assertEqual(len(repo.get_devices()), 2)
+        # Verify presence state transition (Feature 2)
+        self.assertFalse(repo.get_devices()["10.0.0.18"].is_online, "Phone missing ARP sweep should be marked offline/asleep")
+        self.assertTrue(repo.get_devices()["10.0.0.2"].is_online, "Active device must be online")
+        self.assertTrue(repo.get_devices()["10.0.0.2"].is_new, "Brand new device must have is_new=True")
 
         # Clear devices resets for subnet change
         repo.clear_devices()
@@ -589,7 +604,11 @@ class TestPresentationLayer(unittest.TestCase):
         self.assertEqual(json_data["devices"]["10.0.0.18"]["hostname"], "iPhone-7544")
         self.assertIn("category", json_data["devices"]["10.0.0.18"])
         self.assertIn("category_icon", json_data["devices"]["10.0.0.18"])
+        self.assertIn("is_online", json_data["devices"]["10.0.0.18"])
+        self.assertIn("is_new", json_data["devices"]["10.0.0.18"])
         self.assertEqual(json_data["state"]["subnet"], "10.0.0.0/24")
+        self.assertIn("online_count", json_data["state"])
+        self.assertIn("offline_count", json_data["state"])
 
     def test_api_set_subnet_valid(self):
         resp = self.client.post("/api/set-subnet", json={"subnet": "10.0.0.0/25"})
@@ -636,6 +655,8 @@ class TestPresentationLayer(unittest.TestCase):
         self.assertIn("badge-mdns", html)
         self.assertIn("badge-netbios", html)
         self.assertIn("summary-chip", html)
+        self.assertIn("status-indicator-dot online", html)
+        self.assertIn("✨ New", html)
 
 
 class TestEndToEndWorkflow(unittest.TestCase):
@@ -732,6 +753,13 @@ class TestEndToEndWorkflow(unittest.TestCase):
         # Windows PC was retained even though it missed the ARP pass!
         self.assertEqual(devs_pass2["10.0.0.139"].hostname, "PAPPA-CPPC")
         self.assertEqual(devs_pass2["10.0.0.139"].category, DeviceCategory.COMPUTER)
+
+        # Verify Presence Tracking (Feature 2)
+        self.assertTrue(devs_pass2["10.0.0.1"].is_online, "Router must be online")
+        self.assertTrue(devs_pass2["10.0.0.18"].is_online, "Phone answering ARP must be online")
+        self.assertFalse(devs_pass2["10.0.0.139"].is_online, "Sleeping PC missing ARP must be offline/asleep")
+        self.assertEqual(state_pass2.online_count, 2)
+        self.assertEqual(state_pass2.offline_count, 1)
 
         # -------------------------------------------------------------
         # Phase 3: Subnet Transition to 192.168.1.0/24
