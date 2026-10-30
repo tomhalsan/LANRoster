@@ -823,7 +823,8 @@ class TestPresentationLayer(unittest.TestCase):
         self.assertIn("badge-netbios", html)
         self.assertIn("summary-chip", html)
         self.assertIn("status-indicator-dot online", html)
-        self.assertIn("✨ New", html)
+        self.assertIn("badge-new", html)
+        self.assertIn(">New<", html)
 
 
 class TestEndToEndWorkflow(unittest.TestCase):

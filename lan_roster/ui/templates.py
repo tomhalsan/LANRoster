@@ -219,7 +219,6 @@ HTML_DASHBOARD_TEMPLATE = """
             background: #fef08a;
             color: #854d0e;
             border: 1px solid #fde047;
-            gap: 3px;
             height: 20px;
             line-height: 1;
         }
@@ -457,7 +456,7 @@ HTML_DASHBOARD_TEMPLATE = """
                             <div class="hostname-cell">
                                 <span class="hostname">{{ device.hostname }}</span>
                                 {% if device.is_new %}
-                                <span class="badge badge-new" title="First detected at {{ device.first_seen }}">✨ New</span>
+                                <span class="badge badge-new" title="First detected at {{ device.first_seen }}">New</span>
                                 {% endif %}
                                 {% if device.source.value %}
                                 <span class="badge badge-{{ device.source.value.lower() }}">
@@ -586,7 +585,7 @@ HTML_DASHBOARD_TEMPLATE = """
                     const isOnline = info.is_online !== false;
                     const dotClass = isOnline ? 'online' : 'offline';
                     const dotTitle = isOnline ? 'Online (Confirmed responding to sweeps)' : 'Asleep / Offline (Preserved in roster)';
-                    const newBadge = info.is_new ? `<span class="badge badge-new" title="First detected at ${info.first_seen}">✨ New</span>` : '';
+                    const newBadge = info.is_new ? `<span class="badge badge-new" title="First detected at ${info.first_seen}">New</span>` : '';
                     const timeHtml = isOnline 
                         ? `<span class="time-online" title="Last active at ${info.last_seen}">🟢 Online</span>` 
                         : `<span class="time-offline" title="Last seen at ${info.last_seen}">⚪ Asleep (${info.last_seen})</span>`;
