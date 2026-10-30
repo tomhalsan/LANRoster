@@ -77,3 +77,15 @@ This document tracks upcoming planned features and architectural enhancements fo
   - `adapters/enricher/cached_enricher.py`: File-backed cache decorator.
   - `ui/templates.py`: Display `✨ Google Identified` badge and 1-click Google search button for unknown devices.
 
+---
+
+### Feature 8: Dashboard UI/UX Redesign & Modern Layout
+- **Calm Visual Hierarchy**: Eliminate multi-badge visual noise by consolidating IP address and protocol source underneath the primary device name (`Badunkadunk` / `10.0.0.232 • via mDNS`), giving columns generous breathing room.
+- **Interactive Category Filter Tabs**: Convert static category breakdown chips into clickable filter tabs (`All (24)`, `📱 Mobile (5)`, `💻 Computer (3)`, etc.) that instantly filter the device table client-side.
+- **Single Presence & Human Timestamps**: Unify presence dots to a single indicator next to the device name; format last-seen timestamps relatively (`Just now`, `4m ago`, `Yesterday`) with hover tooltips for exact seconds.
+- **Progressive Disclosure**: Tuck reference and troubleshooting guides (Protocol Legend and Windows Firewall steps) into collapsible on-demand sections so data stays front and center.
+- **Clean Architecture Plan**:
+  - `ui/templates.py`: Modernize CSS styling, table layout, and client-side tab filtering logic.
+  - `tests/test_clean_architecture.py`: Update presentation layer assertions to verify new layout and tab markup.
+
+
