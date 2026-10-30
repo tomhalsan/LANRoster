@@ -1,6 +1,7 @@
 import threading
 from typing import Any, Dict
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
+from lan_roster import __version__
 from lan_roster.domain.exceptions import InvalidSubnetException
 from lan_roster.ui.templates import HTML_DASHBOARD_TEMPLATE
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
@@ -23,6 +24,7 @@ def create_web_app(
             devices=devices,
             state=state,
             error=state.error_message,
+            version=__version__,
         )
 
     @app.route("/scan", methods=["POST"])
@@ -42,6 +44,7 @@ def create_web_app(
             ip: dev.to_dict() for ip, dev in devices.items()
         }
         return jsonify({
+            "version": __version__,
             "devices": devices_dict,
             "state": state.to_dict(),
         })
