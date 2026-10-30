@@ -30,7 +30,7 @@ HTML_DASHBOARD_TEMPLATE = """
         }
         .container {
             width: 100%;
-            max-width: 1050px;
+            max-width: 1160px;
         }
         header {
             margin-bottom: 24px;
@@ -154,8 +154,9 @@ HTML_DASHBOARD_TEMPLATE = """
             text-align: left;
         }
         th, td {
-            padding: 14px 18px;
+            padding: 13px 16px;
             border-bottom: 1px solid var(--border);
+            vertical-align: middle;
         }
         th {
             background: #f8fafc;
@@ -185,18 +186,28 @@ HTML_DASHBOARD_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: nowrap;
         }
         .hostname {
             font-weight: 600;
             color: #1e293b;
+            white-space: nowrap;
         }
         .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 20px;
+            box-sizing: border-box;
             font-size: 0.72rem;
             font-weight: 600;
-            padding: 2px 6px;
+            padding: 0 6px;
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 0.04em;
+            white-space: nowrap;
+            flex-shrink: 0;
+            line-height: 1;
         }
         .badge-mdns { background: #ede9fe; color: var(--purple); }
         .badge-netbios { background: #e0f2fe; color: var(--blue); }
@@ -208,6 +219,9 @@ HTML_DASHBOARD_TEMPLATE = """
             background: #fef08a;
             color: #854d0e;
             border: 1px solid #fde047;
+            gap: 3px;
+            height: 20px;
+            line-height: 1;
         }
         .ip-cell {
             display: inline-flex;
@@ -246,14 +260,17 @@ HTML_DASHBOARD_TEMPLATE = """
         .cat-badge {
             display: inline-flex;
             align-items: center;
+            height: 24px;
+            box-sizing: border-box;
             gap: 6px;
             font-size: 0.78rem;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 0 8px;
             border-radius: 6px;
             background: #f1f5f9;
             color: #334155;
             white-space: nowrap;
+            flex-shrink: 0;
         }
         .cat-icon {
             font-size: 0.95rem;
