@@ -441,6 +441,22 @@ class TestAdaptersLayer(unittest.TestCase):
 
     @patch("shutil.which")
     @patch("subprocess.check_output")
+    def test_netbios_nbtstat_output_parsing(self, mock_check_output, mock_which):
+        mock_which.side_effect = lambda cmd: "C:\\Windows\\System32\\nbtstat.exe" if cmd == "nbtstat" else None
+        mock_check_output.return_value = (
+            b"       NetBIOS Remote Machine Name Table\n\n"
+            b"   Name               Type         Status\n"
+            b"---------------------------------------------\n"
+            b"PAPPA-CPPC     <00>  UNIQUE      Registered\n"
+            b"WORKGROUP      <00>  GROUP       Registered\n"
+            b"PAPPA-CPPC     <20>  UNIQUE      Registered\n"
+        )
+        resolver = SocketNetBIOSResolver(timeout=0.5)
+        name = resolver._query_ip("10.0.0.139")
+        self.assertEqual(name, "PAPPA-CPPC")
+
+    @patch("shutil.which")
+    @patch("subprocess.check_output")
     def test_netbios_nmblookup_output_parsing(self, mock_check_output, mock_which):
         mock_which.side_effect = lambda cmd: "/usr/bin/nmblookup" if cmd == "nmblookup" else None
         mock_check_output.return_value = (
