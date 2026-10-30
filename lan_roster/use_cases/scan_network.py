@@ -1,6 +1,7 @@
 import time
 from typing import List
 from lan_roster.domain.models import Device, HostnameSource
+from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import ScanExecutionException
 from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.resolver import HostnameResolverPort
@@ -62,6 +63,13 @@ class ScanNetworkUseCase:
                 ):
                     source = HostnameSource.FIREWALLED
 
+                category = DeviceClassifier.classify(
+                    ip=ip,
+                    hostname=hostname,
+                    vendor=vendor,
+                    source=source,
+                )
+
                 device_entities.append(
                     Device(
                         ip=ip,
@@ -70,6 +78,7 @@ class ScanNetworkUseCase:
                         source=source,
                         vendor=vendor,
                         last_seen=current_time,
+                        category=category,
                     )
                 )
 

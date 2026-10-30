@@ -1,8 +1,11 @@
+import io
 import threading
 import unittest
 from typing import Dict, List, Tuple
+from unittest.mock import MagicMock, patch
 
-from lan_roster.domain.models import Device, HostnameSource, ScanState
+from lan_roster.domain.models import Device, DeviceCategory, HostnameSource, ScanState
+from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import (
     LANRosterException,
     InvalidSubnetException,
@@ -15,6 +18,8 @@ from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
+from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
+from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
 from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
@@ -86,12 +91,64 @@ class TestDomainLayer(unittest.TestCase):
             source=HostnameSource.DNS,
             vendor="Apple iOS Device (Private MAC)",
             last_seen="12:00:00",
+            category=DeviceCategory.MOBILE,
         )
         data = dev.to_dict()
         self.assertEqual(data["mac"], "82:11:02:26:FA:0F")
         self.assertEqual(data["hostname"], "iPhone-7544")
         self.assertEqual(data["source"], "DNS")
         self.assertEqual(data["vendor"], "Apple iOS Device (Private MAC)")
+        self.assertEqual(data["category"], "Mobile")
+        self.assertEqual(data["category_icon"], "📱")
+
+    def test_device_classifier_all_categories(self):
+        # 1. Network
+        cat = DeviceClassifier.classify(ip="10.0.0.1", vendor="ARRIS Group, Inc.")
+        self.assertEqual(cat, DeviceCategory.NETWORK)
+        self.assertEqual(cat.icon, "🌐")
+
+        # 2. Mobile
+        cat = DeviceClassifier.classify(ip="10.0.0.18", hostname="Badunkadunk", vendor="Apple, Inc. (iOS)")
+        self.assertEqual(cat, DeviceCategory.MOBILE)
+        self.assertEqual(cat.icon, "📱")
+
+        # 3. Computer
+        cat = DeviceClassifier.classify(ip="10.0.0.139", hostname="PAPPA-CPPC", source=HostnameSource.NETBIOS)
+        self.assertEqual(cat, DeviceCategory.COMPUTER)
+        cat_mac = DeviceClassifier.classify(ip="10.0.0.28", hostname="Tom's MacBook Pro", vendor="Apple, Inc.")
+        self.assertEqual(cat_mac, DeviceCategory.COMPUTER)
+        self.assertEqual(cat.icon, "💻")
+
+        # 4. Smart TV
+        cat = DeviceClassifier.classify(ip="10.0.0.45", hostname="Living-Room-Apple-TV", vendor="Apple, Inc.")
+        self.assertEqual(cat, DeviceCategory.SMART_TV)
+        cat_cast = DeviceClassifier.classify(ip="10.0.0.46", hostname="Chromecast", vendor="Google Cast")
+        self.assertEqual(cat_cast, DeviceCategory.SMART_TV)
+        self.assertEqual(cat.icon, "📺")
+
+        # 5. Smart Home / Audio
+        cat = DeviceClassifier.classify(ip="10.0.0.70", hostname="Sonos-Beam", vendor="Sonos, Inc.")
+        self.assertEqual(cat, DeviceCategory.SMART_HOME)
+        cat_iot = DeviceClassifier.classify(ip="10.0.0.71", hostname="Smart-Plug", vendor="Espressif Inc.")
+        self.assertEqual(cat_iot, DeviceCategory.SMART_HOME)
+        self.assertEqual(cat.icon, "🔊")
+
+        # 6. Printer
+        cat = DeviceClassifier.classify(ip="10.0.0.60", hostname="HP-LaserJet-Pro", vendor="HP Inc.")
+        self.assertEqual(cat, DeviceCategory.PRINTER)
+        cat_epson = DeviceClassifier.classify(ip="10.0.0.61", vendor="Brother Industries")
+        self.assertEqual(cat_epson, DeviceCategory.PRINTER)
+        self.assertEqual(cat.icon, "🖨️")
+
+        # 7. Gaming
+        cat = DeviceClassifier.classify(ip="10.0.0.80", hostname="PlayStation-5", vendor="Sony Interactive")
+        self.assertEqual(cat, DeviceCategory.GAMING)
+        self.assertEqual(cat.icon, "🎮")
+
+        # 8. Generic / Unknown
+        cat = DeviceClassifier.classify(ip="10.0.0.99", hostname="Unknown", vendor="Generic Device")
+        self.assertEqual(cat, DeviceCategory.GENERIC)
+        self.assertEqual(cat.icon, "📟")
 
     def test_scan_state_to_dict(self):
         state = ScanState(subnet="10.0.0.0/24", is_scanning=True, total_found=5)
@@ -153,6 +210,7 @@ class TestUseCasesLayer(unittest.TestCase):
         win_dev = next(d for d in devices if d.ip == "10.0.0.139")
         self.assertEqual(win_dev.source, HostnameSource.FIREWALLED)
         self.assertEqual(win_dev.vendor, "Intel (Windows PC)")
+        self.assertEqual(win_dev.category, DeviceCategory.COMPUTER)
 
     def test_scan_network_syncs_upnp_metadata(self):
         nodes = [("10.0.0.119", "AA:BB:CC:DD:EE:FF")]
@@ -172,6 +230,7 @@ class TestUseCasesLayer(unittest.TestCase):
         devices = use_case.execute()
         self.assertEqual(len(devices), 1)
         self.assertEqual(devices[0].vendor, "TCL (Smart TV)")
+        self.assertEqual(devices[0].category, DeviceCategory.SMART_TV)
 
     def test_scan_network_failure_handling(self):
         scanner = DummyScanner(raise_error=True)
@@ -190,6 +249,82 @@ class TestUseCasesLayer(unittest.TestCase):
         state = self.repo.get_scan_state()
         self.assertFalse(state.is_scanning)
         self.assertIn("Underlying socket error", state.error_message or "")
+
+    def test_update_subnet_clears_devices_only_when_changed(self):
+        use_case = UpdateSubnetUseCase(device_repo=self.repo)
+        self.repo.save_devices([Device(ip="10.0.0.18", mac="AA:BB:CC:DD:EE:01", hostname="iPhone")])
+        self.assertEqual(len(self.repo.get_devices()), 1)
+
+        # 1. Update with the SAME subnet (or equivalent IP normalizing to 10.0.0.0/24)
+        use_case.execute("10.0.0.1")
+        self.assertEqual(len(self.repo.get_devices()), 1, "Same subnet must retain devices")
+
+        # 2. Update with a DIFFERENT subnet (e.g. 192.168.1.0/24)
+        use_case.execute("192.168.1.0/24")
+        self.assertEqual(len(self.repo.get_devices()), 0, "Changing subnet must clear old subnet devices")
+        self.assertEqual(self.repo.get_scan_state().subnet, "192.168.1.0/24")
+
+    def test_get_devices_empty_and_state(self):
+        use_case = GetDevicesUseCase(device_repo=self.repo)
+        devs, state = use_case.execute()
+        self.assertEqual(devs, {})
+        self.assertEqual(state.subnet, "10.0.0.0/24")
+        self.assertFalse(state.is_scanning)
+
+    def test_scan_network_full_network_spectrum(self):
+        nodes = [
+            ("10.0.0.1", "00:1D:D5:11:22:33"),    # Gateway router
+            ("10.0.0.18", "82:11:02:26:FA:0F"),   # iPhone (Apple Lockdown + mDNS)
+            ("10.0.0.139", "CC:15:31:E5:BB:DB"),  # Windows PC (NetBIOS)
+            ("10.0.0.119", "AA:BB:CC:DD:EE:FF"),  # Smart TV (UPnP/Cast)
+            ("10.0.0.60", "00:1E:68:01:02:03"),   # Printer (HTTP banner)
+            ("10.0.0.95", "00:50:56:00:11:22"),   # Generic node
+        ]
+        scanner = DummyScanner(nodes)
+        resolver = DummyResolver(
+            mapping={
+                "10.0.0.1": ("gateway", HostnameSource.DNS),
+                "10.0.0.18": ("Badunkadunk", HostnameSource.MDNS),
+                "10.0.0.139": ("PAPPA-CPPC", HostnameSource.NETBIOS),
+                "10.0.0.119": ("Living-Room-TV", HostnameSource.SSDP),
+                "10.0.0.60": ("HP-LaserJet-Pro", HostnameSource.HTTP),
+            },
+            metadata={
+                "10.0.0.119": {"manufacturer": "TCL", "model": "Roku TV"},
+            },
+        )
+        manuf_repo = DummyManufacturerRepo()
+        # Mock Arris router and Apple iOS probe
+        manuf_repo.get_manufacturer = lambda mac_address, ip=None: (
+            "ARRIS Group, Inc." if ip == "10.0.0.1"
+            else "Apple, Inc. (iOS)" if ip == "10.0.0.18"
+            else "Intel (Windows PC)" if ip == "10.0.0.139"
+            else "TCL (Roku TV)" if ip == "10.0.0.119"
+            else "HP Inc." if ip == "10.0.0.60"
+            else "Generic Device"
+        )
+
+        use_case = ScanNetworkUseCase(
+            scanner=scanner,
+            resolver=resolver,
+            manufacturer_repo=manuf_repo,
+            device_repo=self.repo,
+        )
+        devices = use_case.execute()
+        self.assertEqual(len(devices), 6)
+
+        by_ip = {d.ip: d for d in devices}
+        self.assertEqual(by_ip["10.0.0.1"].category, DeviceCategory.NETWORK)
+        self.assertEqual(by_ip["10.0.0.18"].category, DeviceCategory.MOBILE)
+        self.assertEqual(by_ip["10.0.0.139"].category, DeviceCategory.COMPUTER)
+        self.assertEqual(by_ip["10.0.0.119"].category, DeviceCategory.SMART_TV)
+        self.assertEqual(by_ip["10.0.0.60"].category, DeviceCategory.PRINTER)
+        self.assertEqual(by_ip["10.0.0.95"].category, DeviceCategory.GENERIC)
+
+        # Ensure total_found in scan state reflects active registry
+        state = self.repo.get_scan_state()
+        self.assertEqual(state.total_found, 6)
+        self.assertFalse(state.is_scanning)
 
     def test_get_devices_numeric_sorting(self):
         self.repo.save_devices([
@@ -277,6 +412,86 @@ class TestAdaptersLayer(unittest.TestCase):
         self.assertIn("login", resolver.GENERIC_TITLES)
         self.assertIn("404 not found", resolver.GENERIC_TITLES)
 
+    @patch("shutil.which")
+    @patch("subprocess.check_output")
+    def test_netbios_smbutil_output_parsing(self, mock_check_output, mock_which):
+        mock_which.side_effect = lambda cmd: "/usr/bin/smbutil" if cmd == "smbutil" else None
+        mock_check_output.return_value = (
+            b"Using IP address of 10.0.0.139: 10.0.0.139\n"
+            b"NetBIOS Name                     Number  Type    Description\n"
+            b"PAPPA-CPPC                       0x00    UNIQUE  [Workstation Service]\n"
+            b"PAPPA-CPPC                       0x20    UNIQUE  [File/Print Server Service]\n"
+            b"WORKGROUP                        0x00    GROUP   [Domain Name]\n"
+        )
+        resolver = SocketNetBIOSResolver(timeout=0.5)
+        name = resolver._query_ip("10.0.0.139")
+        self.assertEqual(name, "PAPPA-CPPC")
+
+    @patch("shutil.which")
+    @patch("subprocess.check_output")
+    def test_netbios_nmblookup_output_parsing(self, mock_check_output, mock_which):
+        mock_which.side_effect = lambda cmd: "/usr/bin/nmblookup" if cmd == "nmblookup" else None
+        mock_check_output.return_value = (
+            b"Looking up status of 10.0.0.139\n"
+            b"\tPAPPA-CPPC      <00> -         B <ACTIVE> \n"
+            b"\tWORKGROUP       <00> - <GROUP> B <ACTIVE> \n"
+        )
+        resolver = SocketNetBIOSResolver(timeout=0.5)
+        name = resolver._query_ip("10.0.0.139")
+        self.assertEqual(name, "PAPPA-CPPC")
+
+    @patch("urllib.request.urlopen")
+    def test_ssdp_xml_descriptor_parsing(self, mock_urlopen):
+        xml_content = (
+            b"<?xml version='1.0'?>\n"
+            b"<root xmlns='urn:schemas-upnp-org:device-1-0'>\n"
+            b"  <device>\n"
+            b"    <friendlyName>Living Room TV</friendlyName>\n"
+            b"    <manufacturer>LG Electronics</manufacturer>\n"
+            b"    <modelName>OLED55C1PUB</modelName>\n"
+            b"  </device>\n"
+            b"</root>"
+        )
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = xml_content
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        resolver = SocketSSDPResolver()
+        name, manuf, model = resolver._fetch_xml_descriptor("10.0.0.50", "http://10.0.0.50:8088/desc.xml")
+        self.assertEqual(name, "Living Room TV")
+        self.assertEqual(manuf, "LG Electronics")
+        self.assertEqual(model, "OLED55C1PUB")
+
+    @patch("urllib.request.urlopen")
+    def test_ssdp_google_cast_parsing(self, mock_urlopen):
+        cast_json = b'{"name": "Den Chromecast", "build_version": "1.56"}'
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = cast_json
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        resolver = SocketSSDPResolver()
+        name, manuf, model = resolver._fetch_cast_info("10.0.0.55")
+        self.assertEqual(name, "Den Chromecast")
+        self.assertEqual(manuf, "Google")
+        self.assertEqual(model, "Chromecast / Google TV")
+
+    @patch("urllib.request.urlopen")
+    def test_http_banner_title_extraction(self, mock_urlopen):
+        html_content = b"<html><head><title>Brother HL-L2350DW series</title></head><body>OK</body></html>"
+        mock_resp = MagicMock()
+        mock_resp.headers = {"Server": "Brother-Embedded-Server"}
+        mock_resp.read.return_value = html_content
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        resolver = SocketHTTPBannerResolver()
+        ip, title, server = resolver._probe_single_ip("10.0.0.60")
+        self.assertEqual(ip, "10.0.0.60")
+        self.assertEqual(title, "Brother HL-L2350DW series")
+        self.assertEqual(server, "Brother-Embedded-Server")
+
     def test_in_memory_repository_thread_safety(self):
         repo = InMemoryDeviceRepository()
 
@@ -307,11 +522,13 @@ class TestAdaptersLayer(unittest.TestCase):
             source=HostnameSource.MDNS,
             vendor="Apple iOS Device (Private MAC)",
             last_seen="01:00:00",
+            category=DeviceCategory.MOBILE,
         )
         repo.save_devices([dev1])
         self.assertEqual(repo.get_devices()["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertEqual(repo.get_devices()["10.0.0.18"].category, DeviceCategory.MOBILE)
 
-        # Pass 2: Phone screen locked, returns Unknown hostname & Private MAC
+        # Pass 2: Phone screen locked, returns Unknown hostname & Private MAC & Generic
         dev2 = Device(
             ip="10.0.0.18",
             mac="82:11:02:26:FA:0F",
@@ -319,13 +536,15 @@ class TestAdaptersLayer(unittest.TestCase):
             source=HostnameSource.UNKNOWN,
             vendor="Private/Randomized MAC",
             last_seen="01:00:30",
+            category=DeviceCategory.GENERIC,
         )
         repo.save_devices([dev2])
 
-        # Roster MUST retain Badunkadunk and Apple iOS Device!
+        # Roster MUST retain Badunkadunk, Apple iOS Device, and Mobile category!
         retained = repo.get_devices()["10.0.0.18"]
         self.assertEqual(retained.hostname, "Badunkadunk")
         self.assertEqual(retained.vendor, "Apple iOS Device (Private MAC)")
+        self.assertEqual(retained.category, DeviceCategory.MOBILE)
         self.assertEqual(retained.last_seen, "01:00:30")
 
         # Pass 3: Phone Wi-Fi in DTIM sleep during 2-second sweep window (misses ARP)
@@ -368,6 +587,8 @@ class TestPresentationLayer(unittest.TestCase):
         json_data = resp.get_json()
         self.assertIn("10.0.0.18", json_data["devices"])
         self.assertEqual(json_data["devices"]["10.0.0.18"]["hostname"], "iPhone-7544")
+        self.assertIn("category", json_data["devices"]["10.0.0.18"])
+        self.assertIn("category_icon", json_data["devices"]["10.0.0.18"])
         self.assertEqual(json_data["state"]["subnet"], "10.0.0.0/24")
 
     def test_api_set_subnet_valid(self):
@@ -381,10 +602,158 @@ class TestPresentationLayer(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("error", resp.get_json())
 
-    def test_index_dashboard_renders_html(self):
+    def test_index_dashboard_renders_html_with_categories_and_chips(self):
+        self.repo.save_devices([
+            Device(
+                ip="10.0.0.18",
+                mac="82:11:02:26:FA:0F",
+                hostname="Badunkadunk",
+                source=HostnameSource.MDNS,
+                vendor="Apple iOS Device (Private MAC)",
+                category=DeviceCategory.MOBILE,
+                last_seen="12:00:00",
+            ),
+            Device(
+                ip="10.0.0.139",
+                mac="CC:15:31:E5:BB:DB",
+                hostname="PAPPA-CPPC",
+                source=HostnameSource.NETBIOS,
+                vendor="Intel (Windows PC)",
+                category=DeviceCategory.COMPUTER,
+                last_seen="12:00:05",
+            ),
+        ])
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn(b"LANRoster", resp.data)
+        html = resp.data.decode("utf-8")
+        self.assertIn("LANRoster", html)
+        self.assertIn("Badunkadunk", html)
+        self.assertIn("PAPPA-CPPC", html)
+        self.assertIn("cat-mobile", html)
+        self.assertIn("cat-computer", html)
+        self.assertIn("📱", html)
+        self.assertIn("💻", html)
+        self.assertIn("badge-mdns", html)
+        self.assertIn("badge-netbios", html)
+        self.assertIn("summary-chip", html)
+
+
+class TestEndToEndWorkflow(unittest.TestCase):
+    """5. End-to-End Tests: Complete multi-pass lifecycles and subnet transitions."""
+
+    def test_full_application_lifecycle_and_roster_retention(self):
+        repo = InMemoryDeviceRepository(initial_subnet="10.0.0.0/24")
+        scan_trigger = threading.Event()
+        update_subnet_uc = UpdateSubnetUseCase(device_repo=repo)
+        get_devices_uc = GetDevicesUseCase(device_repo=repo)
+
+        # -------------------------------------------------------------
+        # Phase 1: Initial Sweep on 10.0.0.0/24
+        # -------------------------------------------------------------
+        nodes_pass1 = [
+            ("10.0.0.1", "00:1D:D5:AA:BB:01"),   # Gateway router
+            ("10.0.0.18", "82:11:02:26:FA:0F"),  # iPhone awake
+            ("10.0.0.139", "CC:15:31:E5:BB:DB"), # Windows PC
+        ]
+        scanner = DummyScanner(nodes_pass1)
+        resolver = DummyResolver({
+            "10.0.0.1": ("gateway", HostnameSource.DNS),
+            "10.0.0.18": ("Badunkadunk", HostnameSource.MDNS),
+            "10.0.0.139": ("PAPPA-CPPC", HostnameSource.NETBIOS),
+        })
+        manuf_repo = DummyManufacturerRepo()
+        manuf_repo.get_manufacturer = lambda mac_address, ip=None: (
+            "ARRIS Group, Inc." if ip == "10.0.0.1"
+            else "Apple, Inc. (iOS)" if ip == "10.0.0.18"
+            else "Intel (Windows PC)" if ip == "10.0.0.139"
+            else "Generic Device"
+        )
+
+        scan_uc = ScanNetworkUseCase(
+            scanner=scanner,
+            resolver=resolver,
+            manufacturer_repo=manuf_repo,
+            device_repo=repo,
+        )
+
+        # Execute sweep
+        scan_uc.execute()
+
+        # Verify via GetDevicesUseCase
+        devs, state = get_devices_uc.execute()
+        self.assertEqual(len(devs), 3)
+        self.assertEqual(list(devs.keys()), ["10.0.0.1", "10.0.0.18", "10.0.0.139"])
+        self.assertEqual(devs["10.0.0.1"].category, DeviceCategory.NETWORK)
+        self.assertEqual(devs["10.0.0.18"].category, DeviceCategory.MOBILE)
+        self.assertEqual(devs["10.0.0.139"].category, DeviceCategory.COMPUTER)
+        self.assertEqual(state.total_found, 3)
+
+        # Verify via Flask REST API
+        app = create_web_app(get_devices_uc, update_subnet_uc, scan_trigger)
+        client = app.test_client()
+        api_resp = client.get("/api/devices")
+        self.assertEqual(api_resp.status_code, 200)
+        api_data = api_resp.get_json()
+        self.assertEqual(len(api_data["devices"]), 3)
+        self.assertEqual(api_data["devices"]["10.0.0.18"]["hostname"], "Badunkadunk")
+        self.assertEqual(api_data["devices"]["10.0.0.18"]["category_icon"], "📱")
+
+        # -------------------------------------------------------------
+        # Phase 2: Second Sweep — Sleeping devices & Screen lock
+        # iPhone: Screen locked (mDNS returns Unknown, vendor returns Private/Randomized)
+        # Windows PC: Asleep (drops off ARP sweep entirely)
+        # -------------------------------------------------------------
+        nodes_pass2 = [
+            ("10.0.0.1", "00:1D:D5:AA:BB:01"),
+            ("10.0.0.18", "82:11:02:26:FA:0F"), # Only router and phone answer ARP
+        ]
+        scanner.nodes = nodes_pass2
+        resolver.mapping = {
+            "10.0.0.1": ("gateway", HostnameSource.DNS),
+            # iPhone has locked screen: mDNS probe returns Unknown
+            "10.0.0.18": ("Unknown", HostnameSource.UNKNOWN),
+        }
+        manuf_repo.get_manufacturer = lambda mac_address, ip=None: (
+            "ARRIS Group, Inc." if ip == "10.0.0.1"
+            else "Private/Randomized MAC" if ip == "10.0.0.18"
+            else "Generic Device"
+        )
+
+        scan_uc.execute()
+
+        # Verify Sticky Retention across sweeps
+        devs_pass2, state_pass2 = get_devices_uc.execute()
+        # All 3 devices are retained!
+        self.assertEqual(len(devs_pass2), 3)
+        # iPhone retained its human name and Mobile category!
+        self.assertEqual(devs_pass2["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertEqual(devs_pass2["10.0.0.18"].vendor, "Apple, Inc. (iOS)")
+        self.assertEqual(devs_pass2["10.0.0.18"].category, DeviceCategory.MOBILE)
+        # Windows PC was retained even though it missed the ARP pass!
+        self.assertEqual(devs_pass2["10.0.0.139"].hostname, "PAPPA-CPPC")
+        self.assertEqual(devs_pass2["10.0.0.139"].category, DeviceCategory.COMPUTER)
+
+        # -------------------------------------------------------------
+        # Phase 3: Subnet Transition to 192.168.1.0/24
+        # -------------------------------------------------------------
+        update_subnet_uc.execute("192.168.1.0/24")
+
+        # Old subnet devices must be cleared
+        devs_cleared, state_cleared = get_devices_uc.execute()
+        self.assertEqual(len(devs_cleared), 0)
+        self.assertEqual(state_cleared.subnet, "192.168.1.0/24")
+
+        # Sweep on new subnet
+        scanner.nodes = [("192.168.1.1", "E4:F0:42:01:02:03")]
+        resolver.mapping = {"192.168.1.1": ("netgear-router", HostnameSource.DNS)}
+        manuf_repo.get_manufacturer = lambda mac_address, ip=None: "Netgear Inc."
+
+        scan_uc.execute()
+
+        devs_new, state_new = get_devices_uc.execute()
+        self.assertEqual(len(devs_new), 1)
+        self.assertEqual(devs_new["192.168.1.1"].category, DeviceCategory.NETWORK)
+        self.assertEqual(state_new.total_found, 1)
 
 
 if __name__ == "__main__":

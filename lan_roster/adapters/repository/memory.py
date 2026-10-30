@@ -1,6 +1,6 @@
 import threading
 from typing import Dict, List
-from lan_roster.domain.models import Device, ScanState
+from lan_roster.domain.models import Device, DeviceCategory, ScanState
 from lan_roster.ports.repository import DeviceRepositoryPort
 
 
@@ -36,6 +36,12 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                     else:
                         vendor = dev.vendor
 
+                    # Retain specific category if new sweep returned generic
+                    if dev.category != DeviceCategory.GENERIC:
+                        category = dev.category
+                    else:
+                        category = existing.category
+
                     self._devices[dev.ip] = Device(
                         ip=dev.ip,
                         mac=dev.mac or existing.mac,
@@ -43,6 +49,7 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                         source=source,
                         vendor=vendor,
                         last_seen=dev.last_seen or existing.last_seen,
+                        category=category,
                     )
                 else:
                     self._devices[dev.ip] = dev

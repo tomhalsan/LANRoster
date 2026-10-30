@@ -204,6 +204,50 @@ HTML_DASHBOARD_TEMPLATE = """
         .badge-dns { background: #dcfce7; color: var(--success); }
         .badge-http { background: #e0e7ff; color: #4338ca; }
         .badge-firewalled { background: #fef3c7; color: #b45309; }
+        .cat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            color: #334155;
+            white-space: nowrap;
+        }
+        .cat-icon {
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+        .cat-mobile { background: #fdf2f8; color: #be185d; }
+        .cat-computer { background: #eff6ff; color: #1d4ed8; }
+        .cat-smart-tv { background: #f5f3ff; color: #6d28d9; }
+        .cat-smart-home { background: #fefce8; color: #a16207; }
+        .cat-printer { background: #f0fdf4; color: #15803d; }
+        .cat-network { background: #f0fdfa; color: #0f766e; }
+        .cat-gaming { background: #fdf4ff; color: #a21caf; }
+        .cat-generic { background: #f8fafc; color: #64748b; }
+        .category-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+        .summary-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 9999px;
+            background: #f8fafc;
+            color: #475569;
+            border: 1px solid var(--border);
+        }
         .vendor {
             font-size: 0.88rem;
             color: #334155;
@@ -303,22 +347,46 @@ HTML_DASHBOARD_TEMPLATE = """
                     Discovered: <strong id="deviceCount">{{ devices|length }}</strong> active devices | Last updated: <span id="lastSeen">{{ state.last_scan_time }}</span>
                 </div>
             </div>
+            <div class="category-summary" id="categorySummary">
+                {% set counts = {} %}
+                {% for dev in devices.values() %}
+                    {% set cat_val = dev.category.value if dev.category else 'Generic' %}
+                    {% set cat_icn = dev.category.icon if dev.category else '📟' %}
+                    {% if cat_val not in counts %}
+                        {% set _ = counts.update({cat_val: {'count': 1, 'icon': cat_icn}}) %}
+                    {% else %}
+                        {% set _ = counts.update({cat_val: {'count': counts[cat_val]['count'] + 1, 'icon': cat_icn}}) %}
+                    {% endif %}
+                {% endfor %}
+                {% for cat_val, cinfo in counts.items() %}
+                <span class="summary-chip">
+                    <span>{{ cinfo.icon }}</span> {{ cinfo.count }} {{ cat_val }}
+                </span>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="card">
             <table>
                 <thead>
                     <tr>
-                        <th>IP Address</th>
+                        <th style="width: 130px;">Type</th>
+                        <th style="width: 140px;">IP Address</th>
                         <th>Hostname</th>
                         <th>Device / Manufacturer</th>
-                        <th>MAC Address</th>
-                        <th>Last Seen</th>
+                        <th style="width: 155px;">MAC Address</th>
+                        <th style="width: 95px;">Last Seen</th>
                     </tr>
                 </thead>
                 <tbody id="devicesTable">
                     {% for ip, device in devices.items() %}
                     <tr>
+                        <td>
+                            <span class="cat-badge cat-{{ device.category.value.lower().replace(' ', '-') if device.category else 'generic' }}">
+                                <span class="cat-icon">{{ device.category.icon if device.category else '📟' }}</span>
+                                <span>{{ device.category.value if device.category else 'Generic' }}</span>
+                            </span>
+                        </td>
                         <td class="ip">{{ ip }}</td>
                         <td>
                             <div class="hostname-cell">
@@ -336,7 +404,7 @@ HTML_DASHBOARD_TEMPLATE = """
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="empty-state">
+                        <td colspan="6" class="empty-state">
                             Scanning subnet range... devices will populate automatically.
                         </td>
                     </tr>
@@ -396,9 +464,29 @@ HTML_DASHBOARD_TEMPLATE = """
                 });
 
                 if (sortedIps.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No devices discovered yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No devices discovered yet.</td></tr>`;
+                    const summaryEl = document.getElementById('categorySummary');
+                    if (summaryEl) summaryEl.innerHTML = '';
                     return;
                 }
+
+                // Build category summary counts
+                const catCounts = {};
+                for (const ip of sortedIps) {
+                    const cat = data.devices[ip].category || 'Generic';
+                    const icon = data.devices[ip].category_icon || '📟';
+                    if (!catCounts[cat]) {
+                        catCounts[cat] = { count: 0, icon: icon };
+                    }
+                    catCounts[cat].count++;
+                }
+
+                let sumHtml = '';
+                for (const [cat, cinfo] of Object.entries(catCounts)) {
+                    sumHtml += `<span class="summary-chip"><span>${cinfo.icon}</span> ${cinfo.count} ${cat}</span>`;
+                }
+                const summaryEl = document.getElementById('categorySummary');
+                if (summaryEl) summaryEl.innerHTML = sumHtml;
 
                 let html = '';
                 for (const ip of sortedIps) {
@@ -412,7 +500,17 @@ HTML_DASHBOARD_TEMPLATE = """
                         ? `<span class="badge badge-${info.source.toLowerCase()}">${badgeLabel}</span>` 
                         : '';
 
+                    const catClass = (info.category || 'Generic').toLowerCase().replace(/\\s+/g, '-');
+                    const catIcon = info.category_icon || '📟';
+                    const catVal = info.category || 'Generic';
+
                     html += `<tr>
+                        <td>
+                            <span class="cat-badge cat-${catClass}">
+                                <span class="cat-icon">${catIcon}</span>
+                                <span>${catVal}</span>
+                            </span>
+                        </td>
                         <td class="ip">${ip}</td>
                         <td>
                             <div class="hostname-cell">
