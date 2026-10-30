@@ -4,18 +4,18 @@ This document tracks upcoming planned features and architectural enhancements fo
 
 ---
 
-## 📋 Feature Backlog
+## ✅ Completed Features
 
-### Feature 2: Device Presence Tracking (Online vs. Last Seen & New Device Alert)
-- **Status Indicator**: Dynamic pulsing green dot for devices responding to current ARP sweeps; muted grey indicator for asleep/offline devices.
-- **Timestamp Tracking**: Track `first_seen` and `last_seen` timestamps in `Device` domain model.
-- **"New Device" Badge**: Visual highlight for devices detected on the network for the first time within a configurable window (e.g., past 2 hours), alerting users to new connections or unknown devices.
-- **Clean Architecture Plan**:
-  - `domain/models.py`: Add `first_seen: datetime`, `last_seen: datetime`, and `is_online: bool` to `Device`.
-  - `adapters/repository/memory.py`: Update timestamp tracking during roster merge.
-  - `ui/templates.py`: Add presence status badges and time-ago formatting.
+- **Feature 1: Smart Device Categorization & Visual Icons**: Automatic node classification into 8 categories with visual emoji icons and summary breakdown chips.
+- **Feature 2: Device Presence Tracking (Online vs. Last Seen & New Device Alert)**:
+  - **Dynamic Status Indicator**: Pulsing green dot (🟢 Online) for nodes answering sweeps; muted grey dot (⚪ Asleep) for inactive/sleeping devices.
+  - **"✨ New" Badge**: Automatically tags devices joining the network for the first time in the current session.
+  - **Dual Timestamping**: Tracks `first_seen` and `last_seen` timestamps.
+  - **Real-Time Counters**: Displays online vs. asleep counts in the dashboard header.
 
 ---
+
+## 📋 Feature Backlog
 
 ### Feature 3: Expandable Device Drawer & One-Click Port Shortcuts
 - **Interactive Device Drawer**: Click on any device row to slide open an inspection panel.

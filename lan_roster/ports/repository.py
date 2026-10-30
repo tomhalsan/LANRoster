@@ -34,6 +34,8 @@ class DeviceRepositoryPort(ABC):
         last_scan_time: str | None = None,
         error_message: str | None = None,
         total_found: int | None = None,
+        online_count: int | None = None,
+        offline_count: int | None = None,
     ) -> ScanState:
         """Updates specific fields of the current scanner state."""
         pass

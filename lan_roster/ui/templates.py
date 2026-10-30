@@ -204,6 +204,45 @@ HTML_DASHBOARD_TEMPLATE = """
         .badge-dns { background: #dcfce7; color: var(--success); }
         .badge-http { background: #e0e7ff; color: #4338ca; }
         .badge-firewalled { background: #fef3c7; color: #b45309; }
+        .badge-new {
+            background: #fef08a;
+            color: #854d0e;
+            border: 1px solid #fde047;
+        }
+        .ip-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .status-indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .status-indicator-dot.online {
+            background: #16a34a;
+            box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+            animation: pulse-online 2.2s infinite ease-in-out;
+        }
+        .status-indicator-dot.offline {
+            background: #94a3b8;
+            box-shadow: 0 0 0 1px #cbd5e1;
+        }
+        @keyframes pulse-online {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.25); opacity: 0.8; }
+        }
+        .time-online {
+            color: #16a34a;
+            font-weight: 600;
+            font-size: 0.84rem;
+        }
+        .time-offline {
+            color: #64748b;
+            font-size: 0.84rem;
+        }
         .cat-badge {
             display: inline-flex;
             align-items: center;
@@ -344,7 +383,10 @@ HTML_DASHBOARD_TEMPLATE = """
                     </span>
                 </div>
                 <div style="color: var(--text-muted); font-size: 0.85rem;" id="metaText">
-                    Discovered: <strong id="deviceCount">{{ devices|length }}</strong> active devices | Last updated: <span id="lastSeen">{{ state.last_scan_time }}</span>
+                    Discovered: <strong id="deviceCount">{{ devices|length }}</strong> devices 
+                    (<span id="onlineCount" style="color: #16a34a; font-weight: 600;">{{ state.online_count }} online</span>, 
+                    <span id="offlineCount" style="color: #64748b;">{{ state.offline_count }} asleep</span>) | 
+                    Last updated: <span id="lastSeen">{{ state.last_scan_time }}</span>
                 </div>
             </div>
             <div class="category-summary" id="categorySummary">
@@ -371,11 +413,11 @@ HTML_DASHBOARD_TEMPLATE = """
                 <thead>
                     <tr>
                         <th style="width: 130px;">Type</th>
-                        <th style="width: 140px;">IP Address</th>
+                        <th style="width: 145px;">IP Address</th>
                         <th>Hostname</th>
                         <th>Device / Manufacturer</th>
                         <th style="width: 155px;">MAC Address</th>
-                        <th style="width: 95px;">Last Seen</th>
+                        <th style="width: 135px;">Status / Last Seen</th>
                     </tr>
                 </thead>
                 <tbody id="devicesTable">
@@ -387,10 +429,19 @@ HTML_DASHBOARD_TEMPLATE = """
                                 <span>{{ device.category.value if device.category else 'Generic' }}</span>
                             </span>
                         </td>
-                        <td class="ip">{{ ip }}</td>
+                        <td class="ip">
+                            <div class="ip-cell">
+                                <span class="status-indicator-dot {% if device.is_online %}online{% else %}offline{% endif %}" 
+                                      title="{% if device.is_online %}Online (Confirmed responding to sweeps){% else %}Asleep / Offline (Preserved in roster){% endif %}"></span>
+                                <span>{{ ip }}</span>
+                            </div>
+                        </td>
                         <td>
                             <div class="hostname-cell">
                                 <span class="hostname">{{ device.hostname }}</span>
+                                {% if device.is_new %}
+                                <span class="badge badge-new" title="First detected at {{ device.first_seen }}">✨ New</span>
+                                {% endif %}
                                 {% if device.source.value %}
                                 <span class="badge badge-{{ device.source.value.lower() }}">
                                     {% if device.source.value == 'Firewalled' %}Windows (Firewalled){% else %}{{ device.source.value }}{% endif %}
@@ -400,7 +451,13 @@ HTML_DASHBOARD_TEMPLATE = """
                         </td>
                         <td class="vendor {% if 'Private' in device.vendor %}vendor-private{% endif %}">{{ device.vendor }}</td>
                         <td class="mac">{{ device.mac }}</td>
-                        <td class="time">{{ device.last_seen }}</td>
+                        <td class="time">
+                            {% if device.is_online %}
+                            <span class="time-online" title="Last active at {{ device.last_seen }}">🟢 Online</span>
+                            {% else %}
+                            <span class="time-offline" title="Last seen at {{ device.last_seen }}">⚪ Asleep ({{ device.last_seen }})</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
@@ -453,6 +510,11 @@ HTML_DASHBOARD_TEMPLATE = """
                 deviceCount.textContent = Object.keys(data.devices).length;
                 lastSeen.textContent = data.state.last_scan_time;
 
+                const onlineCountEl = document.getElementById('onlineCount');
+                const offlineCountEl = document.getElementById('offlineCount');
+                if (onlineCountEl) onlineCountEl.textContent = `${data.state.online_count || 0} online`;
+                if (offlineCountEl) offlineCountEl.textContent = `${data.state.offline_count || 0} asleep`;
+
                 const tbody = document.getElementById('devicesTable');
                 const sortedIps = Object.keys(data.devices).sort((a, b) => {
                     const pa = a.split('.').map(Number);
@@ -504,6 +566,14 @@ HTML_DASHBOARD_TEMPLATE = """
                     const catIcon = info.category_icon || '📟';
                     const catVal = info.category || 'Generic';
 
+                    const isOnline = info.is_online !== false;
+                    const dotClass = isOnline ? 'online' : 'offline';
+                    const dotTitle = isOnline ? 'Online (Confirmed responding to sweeps)' : 'Asleep / Offline (Preserved in roster)';
+                    const newBadge = info.is_new ? `<span class="badge badge-new" title="First detected at ${info.first_seen}">✨ New</span>` : '';
+                    const timeHtml = isOnline 
+                        ? `<span class="time-online" title="Last active at ${info.last_seen}">🟢 Online</span>` 
+                        : `<span class="time-offline" title="Last seen at ${info.last_seen}">⚪ Asleep (${info.last_seen})</span>`;
+
                     html += `<tr>
                         <td>
                             <span class="cat-badge cat-${catClass}">
@@ -511,16 +581,22 @@ HTML_DASHBOARD_TEMPLATE = """
                                 <span>${catVal}</span>
                             </span>
                         </td>
-                        <td class="ip">${ip}</td>
+                        <td class="ip">
+                            <div class="ip-cell">
+                                <span class="status-indicator-dot ${dotClass}" title="${dotTitle}"></span>
+                                <span>${ip}</span>
+                            </div>
+                        </td>
                         <td>
                             <div class="hostname-cell">
                                 <span class="hostname">${info.hostname}</span>
+                                ${newBadge}
                                 ${badgeHtml}
                             </div>
                         </td>
                         <td class="vendor ${isPrivate}">${info.vendor}</td>
                         <td class="mac">${info.mac}</td>
-                        <td class="time">${info.last_seen}</td>
+                        <td class="time">${timeHtml}</td>
                     </tr>`;
                 }
                 tbody.innerHTML = html;
