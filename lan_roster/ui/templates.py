@@ -359,6 +359,57 @@ HTML_DASHBOARD_TEMPLATE = """
         .windows-steps li {
             margin-bottom: 5px;
         }
+        .legend-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-top: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .legend-header h3 {
+            font-size: 1.02rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 14px 28px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .legend-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+        .legend-item .badge {
+            margin-top: 1px;
+        }
+        .legend-desc {
+            color: #475569;
+        }
+        .legend-desc strong {
+            color: #1e293b;
+        }
+        .legend-desc code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.82rem;
+            background: #f1f5f9;
+            padding: 1px 4px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -484,6 +535,74 @@ HTML_DASHBOARD_TEMPLATE = """
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <div class="legend-card">
+            <div class="legend-header">
+                <h3>📖 Protocol & Status Legend</h3>
+            </div>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <span class="badge badge-new">New</span>
+                    <div class="legend-desc">
+                        <strong>New Device:</strong> Joined the network for the first time during this monitoring session.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-mdns">mDNS</span>
+                    <div class="legend-desc">
+                        <strong>Multicast DNS / Bonjour:</strong> Apple Zeroconf probe capturing human names (<code>.local</code>, AirPlay, Continuity).
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-netbios">NetBIOS</span>
+                    <div class="legend-desc">
+                        <strong>NetBIOS Name Service:</strong> Windows workstation and Samba computer name query over UDP 137.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-ssdp">SSDP</span>
+                    <div class="legend-desc">
+                        <strong>UPnP / Google Cast:</strong> XML device descriptors and Cast setup discovery on ports 1900 / 8008.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-dns">DNS</span>
+                    <div class="legend-desc">
+                        <strong>Gateway Reverse DNS:</strong> Direct PTR queries against local router (port 53) for DHCP client names.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-http">HTTP</span>
+                    <div class="legend-desc">
+                        <strong>Web Banner / Title:</strong> HTML page title and Server header inspection from embedded web interfaces (ports 80/8080).
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-firewalled">Windows (Firewalled)</span>
+                    <div class="legend-desc">
+                        <strong>Stealth Firewall:</strong> Known PC manufacturer whose firewall dropped discovery probes without answering.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span class="status-indicator-dot online"></span>
+                        <span class="time-online">Online</span>
+                    </div>
+                    <div class="legend-desc">
+                        <strong>Active Node:</strong> Device actively responded to the most recent Layer 2 ARP sweep.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span class="status-indicator-dot offline"></span>
+                        <span class="time-offline">Asleep</span>
+                    </div>
+                    <div class="legend-desc">
+                        <strong>Asleep / Preserved:</strong> Known device retained in roster, currently sleeping or inactive.
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="windows-card">
