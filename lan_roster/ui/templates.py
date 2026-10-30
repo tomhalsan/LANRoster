@@ -35,6 +35,25 @@ HTML_DASHBOARD_TEMPLATE = """
         header {
             margin-bottom: 24px;
         }
+        .header-title {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .header-title h1 {
+            margin-bottom: 0;
+        }
+        .version-tag {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            letter-spacing: 0.02em;
+            line-height: 1.2;
+        }
         h1 {
             font-size: 1.75rem;
             font-weight: 700;
@@ -415,7 +434,10 @@ HTML_DASHBOARD_TEMPLATE = """
 <body>
     <div class="container">
         <header>
-            <h1>LANRoster</h1>
+            <div class="header-title">
+                <h1>LANRoster</h1>
+                <span class="version-tag">v{{ version | default('0.2.0') }}</span>
+            </div>
             <p class="subtitle">Real-time local device discovery with mDNS, NetBIOS, SSDP, and hardware fingerprinting</p>
         </header>
 

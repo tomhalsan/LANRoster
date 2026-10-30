@@ -4,6 +4,7 @@ import unittest
 from typing import Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
+from lan_roster import __version__
 from lan_roster.domain.models import Device, DeviceCategory, HostnameSource, ScanState
 from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import (
@@ -767,6 +768,7 @@ class TestPresentationLayer(unittest.TestCase):
         resp = self.client.get("/api/devices")
         self.assertEqual(resp.status_code, 200)
         json_data = resp.get_json()
+        self.assertEqual(json_data["version"], "0.2.0")
         self.assertIn("10.0.0.18", json_data["devices"])
         self.assertEqual(json_data["devices"]["10.0.0.18"]["hostname"], "iPhone-7544")
         self.assertIn("category", json_data["devices"]["10.0.0.18"])
@@ -813,6 +815,8 @@ class TestPresentationLayer(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode("utf-8")
         self.assertIn("LANRoster", html)
+        self.assertIn("v0.2.0", html)
+        self.assertEqual(__version__, "0.2.0")
         self.assertIn("Badunkadunk", html)
         self.assertIn("PAPPA-CPPC", html)
         self.assertIn("cat-mobile", html)
