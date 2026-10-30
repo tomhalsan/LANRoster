@@ -18,6 +18,7 @@ from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
+from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
 from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
@@ -351,6 +352,26 @@ class TestUseCasesLayer(unittest.TestCase):
 
 class TestAdaptersLayer(unittest.TestCase):
     """3. Adapters Layer Tests: Implementations of port interfaces."""
+
+    def test_scapy_scanner_windows_npcap_detection(self):
+        # Non-Windows host returns True
+        with patch.object(ScapyArpScanner, "is_windows", return_value=False):
+            self.assertTrue(ScapyArpScanner.check_windows_npcap_installed())
+
+        # Windows host without Npcap DLLs returns False and raises helpful guidance
+        with patch.object(ScapyArpScanner, "is_windows", return_value=True):
+            with patch("os.path.exists", return_value=False):
+                self.assertFalse(ScapyArpScanner.check_windows_npcap_installed())
+                scanner = ScapyArpScanner()
+                with self.assertRaises(RuntimeError) as ctx:
+                    scanner.scan("10.0.0.0/24")
+                self.assertIn("Npcap is required", str(ctx.exception))
+                self.assertIn("https://npcap.com", str(ctx.exception))
+
+        # Windows host with Npcap installed returns True
+        with patch.object(ScapyArpScanner, "is_windows", return_value=True):
+            with patch("os.path.exists", return_value=True):
+                self.assertTrue(ScapyArpScanner.check_windows_npcap_installed())
 
     def test_manufacturer_repo_privacy_detection(self):
         repo = HybridManufacturerRepository()

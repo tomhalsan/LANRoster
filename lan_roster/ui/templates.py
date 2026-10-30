@@ -354,7 +354,7 @@ HTML_DASHBOARD_TEMPLATE = """
 
         {% if error %}
         <div class="error-banner">
-            ⚠️ {{ error }}
+            ⚠️ {{ error | safe }}
         </div>
         {% endif %}
 

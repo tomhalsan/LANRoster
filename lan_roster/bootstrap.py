@@ -29,6 +29,21 @@ def bootstrap():
     manufacturer_repository = HybridManufacturerRepository()
     network_scanner = ScapyArpScanner(timeout=2)
 
+    # Pre-flight environment check on Windows
+    if network_scanner.is_windows() and not network_scanner.check_windows_npcap_installed():
+        npcap_msg = (
+            'Npcap driver not detected! Windows requires Npcap for Layer 2 ARP scanning. '
+            'Please install Npcap from <a href="https://npcap.com" target="_blank" style="color: #991b1b; font-weight: 700; text-decoration: underline;">https://npcap.com</a> '
+            '(check "Install Npcap in WinPcap API-compatible Mode") and run as Administrator.'
+        )
+        device_repository.update_scan_state(error_message=npcap_msg)
+        print("\n" + "=" * 76)
+        print("[!] WINDOWS PRE-FLIGHT CHECK: Npcap packet capture driver not found!")
+        print("    1. Download the free Npcap installer from: https://npcap.com")
+        print("    2. Check 'Install Npcap in WinPcap API-compatible Mode'")
+        print("    3. Launch PowerShell / Command Prompt as Administrator and restart LANRoster")
+        print("=" * 76 + "\n")
+
     composite_resolver = CompositeHostnameResolver(
         mdns_resolver=SocketMDNSResolver(timeout=1.5),
         netbios_resolver=SocketNetBIOSResolver(timeout=0.4, max_workers=20),
