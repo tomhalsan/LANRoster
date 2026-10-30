@@ -3,3 +3,11 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# SQLite database files and journals
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+.lan_roster/
+

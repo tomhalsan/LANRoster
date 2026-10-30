@@ -28,6 +28,9 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
   - Live visual presence dots: pulsing green (🟢 **Online**) for active nodes answering sweeps; muted grey (⚪ **Asleep**) for inactive/sleeping devices preserved via roster retention.
   - **"✨ New" Badge**: Automatically tags devices joining the network for the first time in the current session.
   - Header counters displaying real-time online vs. asleep device tallies.
+- **SQLite Database Persistence**:
+  - Automatically stores discovered device identities, hostnames, categories, and first/last seen timestamps in `~/.lan_roster/lan_roster.db` using WAL mode.
+  - Device records, vendor identifications, and "✨ New Device" history survive computer reboots and process restarts.
 - **Dynamic Subnet Control**:
   - Automatically detects the host machine's active local subnet upon launch (e.g. `10.0.0.0/24`).
   - Allows entering custom subnets and CIDR blocks (e.g., `10.0.0.0/25`, `192.168.1.0/24`) directly from the web interface for instant rescanning.

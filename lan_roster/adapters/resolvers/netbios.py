@@ -53,7 +53,22 @@ class SocketNetBIOSResolver(HostnameResolverPort):
             except Exception:
                 pass
 
-        # 3. Direct UDP 137 node status packet fallback
+        # 3. On Windows, query via native nbtstat utility
+        if shutil.which("nbtstat"):
+            try:
+                out = subprocess.check_output(
+                    ["nbtstat", "-A", ip],
+                    timeout=self.timeout,
+                    stderr=subprocess.DEVNULL,
+                ).decode("utf-8", errors="ignore")
+                for line in out.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3 and "<00>" in parts[1] and "UNIQUE" in parts[2].upper():
+                        return parts[0].strip()
+            except Exception:
+                pass
+
+        # 4. Direct UDP 137 node status packet fallback
         name = "*" + " " * 14 + "\x00"
         encoded: List[str] = []
         for c in name:

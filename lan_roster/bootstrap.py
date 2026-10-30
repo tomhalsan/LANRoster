@@ -7,7 +7,7 @@ from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
 from lan_roster.adapters.resolvers.dns import SocketDNSResolver
 from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
-from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
+from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
 from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
@@ -25,9 +25,24 @@ def bootstrap():
     default_subnet = network_config.detect_default_subnet()
     default_gateway = network_config.detect_default_gateway()
 
-    device_repository = InMemoryDeviceRepository(initial_subnet=default_subnet)
+    device_repository = SqliteDeviceRepository(initial_subnet=default_subnet)
     manufacturer_repository = HybridManufacturerRepository()
     network_scanner = ScapyArpScanner(timeout=2)
+
+    # Pre-flight environment check on Windows
+    if network_scanner.is_windows() and not network_scanner.check_windows_npcap_installed():
+        npcap_msg = (
+            'Npcap driver not detected! Windows requires Npcap for Layer 2 ARP scanning. '
+            'Please install Npcap from <a href="https://npcap.com" target="_blank" style="color: #991b1b; font-weight: 700; text-decoration: underline;">https://npcap.com</a> '
+            '(check "Install Npcap in WinPcap API-compatible Mode") and run as Administrator.'
+        )
+        device_repository.update_scan_state(error_message=npcap_msg)
+        print("\n" + "=" * 76)
+        print("[!] WINDOWS PRE-FLIGHT CHECK: Npcap packet capture driver not found!")
+        print("    1. Download the free Npcap installer from: https://npcap.com")
+        print("    2. Check 'Install Npcap in WinPcap API-compatible Mode'")
+        print("    3. Launch PowerShell / Command Prompt as Administrator and restart LANRoster")
+        print("=" * 76 + "\n")
 
     composite_resolver = CompositeHostnameResolver(
         mdns_resolver=SocketMDNSResolver(timeout=1.5),

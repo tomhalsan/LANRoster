@@ -30,7 +30,7 @@ HTML_DASHBOARD_TEMPLATE = """
         }
         .container {
             width: 100%;
-            max-width: 1050px;
+            max-width: 1160px;
         }
         header {
             margin-bottom: 24px;
@@ -154,8 +154,9 @@ HTML_DASHBOARD_TEMPLATE = """
             text-align: left;
         }
         th, td {
-            padding: 14px 18px;
+            padding: 13px 16px;
             border-bottom: 1px solid var(--border);
+            vertical-align: middle;
         }
         th {
             background: #f8fafc;
@@ -185,18 +186,28 @@ HTML_DASHBOARD_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: nowrap;
         }
         .hostname {
             font-weight: 600;
             color: #1e293b;
+            white-space: nowrap;
         }
         .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 20px;
+            box-sizing: border-box;
             font-size: 0.72rem;
             font-weight: 600;
-            padding: 2px 6px;
+            padding: 0 6px;
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 0.04em;
+            white-space: nowrap;
+            flex-shrink: 0;
+            line-height: 1;
         }
         .badge-mdns { background: #ede9fe; color: var(--purple); }
         .badge-netbios { background: #e0f2fe; color: var(--blue); }
@@ -208,6 +219,8 @@ HTML_DASHBOARD_TEMPLATE = """
             background: #fef08a;
             color: #854d0e;
             border: 1px solid #fde047;
+            height: 20px;
+            line-height: 1;
         }
         .ip-cell {
             display: inline-flex;
@@ -246,14 +259,17 @@ HTML_DASHBOARD_TEMPLATE = """
         .cat-badge {
             display: inline-flex;
             align-items: center;
+            height: 24px;
+            box-sizing: border-box;
             gap: 6px;
             font-size: 0.78rem;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 0 8px;
             border-radius: 6px;
             background: #f1f5f9;
             color: #334155;
             white-space: nowrap;
+            flex-shrink: 0;
         }
         .cat-icon {
             font-size: 0.95rem;
@@ -343,6 +359,57 @@ HTML_DASHBOARD_TEMPLATE = """
         .windows-steps li {
             margin-bottom: 5px;
         }
+        .legend-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-top: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .legend-header h3 {
+            font-size: 1.02rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 14px 28px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .legend-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+        .legend-item .badge {
+            margin-top: 1px;
+        }
+        .legend-desc {
+            color: #475569;
+        }
+        .legend-desc strong {
+            color: #1e293b;
+        }
+        .legend-desc code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.82rem;
+            background: #f1f5f9;
+            padding: 1px 4px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -354,7 +421,7 @@ HTML_DASHBOARD_TEMPLATE = """
 
         {% if error %}
         <div class="error-banner">
-            ⚠️ {{ error }}
+            ⚠️ {{ error | safe }}
         </div>
         {% endif %}
 
@@ -440,7 +507,7 @@ HTML_DASHBOARD_TEMPLATE = """
                             <div class="hostname-cell">
                                 <span class="hostname">{{ device.hostname }}</span>
                                 {% if device.is_new %}
-                                <span class="badge badge-new" title="First detected at {{ device.first_seen }}">✨ New</span>
+                                <span class="badge badge-new" title="First detected at {{ device.first_seen }}">New</span>
                                 {% endif %}
                                 {% if device.source.value %}
                                 <span class="badge badge-{{ device.source.value.lower() }}">
@@ -468,6 +535,74 @@ HTML_DASHBOARD_TEMPLATE = """
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <div class="legend-card">
+            <div class="legend-header">
+                <h3>📖 Protocol & Status Legend</h3>
+            </div>
+            <div class="legend-grid">
+                <div class="legend-item">
+                    <span class="badge badge-new">New</span>
+                    <div class="legend-desc">
+                        <strong>New Device:</strong> Joined the network for the first time during this monitoring session.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-mdns">mDNS</span>
+                    <div class="legend-desc">
+                        <strong>Multicast DNS / Bonjour:</strong> Apple Zeroconf probe capturing human names (<code>.local</code>, AirPlay, Continuity).
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-netbios">NetBIOS</span>
+                    <div class="legend-desc">
+                        <strong>NetBIOS Name Service:</strong> Windows workstation and Samba computer name query over UDP 137.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-ssdp">SSDP</span>
+                    <div class="legend-desc">
+                        <strong>UPnP / Google Cast:</strong> XML device descriptors and Cast setup discovery on ports 1900 / 8008.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-dns">DNS</span>
+                    <div class="legend-desc">
+                        <strong>Gateway Reverse DNS:</strong> Direct PTR queries against local router (port 53) for DHCP client names.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-http">HTTP</span>
+                    <div class="legend-desc">
+                        <strong>Web Banner / Title:</strong> HTML page title and Server header inspection from embedded web interfaces (ports 80/8080).
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <span class="badge badge-firewalled">Windows (Firewalled)</span>
+                    <div class="legend-desc">
+                        <strong>Stealth Firewall:</strong> Known PC manufacturer whose firewall dropped discovery probes without answering.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span class="status-indicator-dot online"></span>
+                        <span class="time-online">Online</span>
+                    </div>
+                    <div class="legend-desc">
+                        <strong>Active Node:</strong> Device actively responded to the most recent Layer 2 ARP sweep.
+                    </div>
+                </div>
+                <div class="legend-item">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <span class="status-indicator-dot offline"></span>
+                        <span class="time-offline">Asleep</span>
+                    </div>
+                    <div class="legend-desc">
+                        <strong>Asleep / Preserved:</strong> Known device retained in roster, currently sleeping or inactive.
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="windows-card">
@@ -569,7 +704,7 @@ HTML_DASHBOARD_TEMPLATE = """
                     const isOnline = info.is_online !== false;
                     const dotClass = isOnline ? 'online' : 'offline';
                     const dotTitle = isOnline ? 'Online (Confirmed responding to sweeps)' : 'Asleep / Offline (Preserved in roster)';
-                    const newBadge = info.is_new ? `<span class="badge badge-new" title="First detected at ${info.first_seen}">✨ New</span>` : '';
+                    const newBadge = info.is_new ? `<span class="badge badge-new" title="First detected at ${info.first_seen}">New</span>` : '';
                     const timeHtml = isOnline 
                         ? `<span class="time-online" title="Last active at ${info.last_seen}">🟢 Online</span>` 
                         : `<span class="time-offline" title="Last seen at ${info.last_seen}">⚪ Asleep (${info.last_seen})</span>`;
