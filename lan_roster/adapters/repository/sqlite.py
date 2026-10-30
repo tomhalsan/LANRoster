@@ -253,3 +253,4 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
         """Closes the underlying SQLite database connection."""
         with self._lock:
             self._conn.close()
+
