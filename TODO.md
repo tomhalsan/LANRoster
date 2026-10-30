@@ -12,6 +12,9 @@ This document tracks upcoming planned features and architectural enhancements fo
   - **"✨ New" Badge**: Automatically tags devices joining the network for the first time in the current session.
   - **Dual Timestamping**: Tracks `first_seen` and `last_seen` timestamps.
   - **Real-Time Counters**: Displays online vs. asleep counts in the dashboard header.
+- **SQLite Database Persistence**:
+  - `SqliteDeviceRepository`: Durable SQLite storage at `~/.lan_roster/lan_roster.db` with WAL mode.
+  - Device identities, hostnames, and timestamps survive app restarts.
 
 ---
 

@@ -15,6 +15,7 @@ from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
+from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
@@ -571,6 +572,135 @@ class TestAdaptersLayer(unittest.TestCase):
         # Clear devices resets for subnet change
         repo.clear_devices()
         self.assertEqual(len(repo.get_devices()), 0)
+
+    def test_sqlite_repository_initialization_and_schema(self):
+        repo = SqliteDeviceRepository(db_path=":memory:", initial_subnet="10.0.0.0/24")
+        state = repo.get_scan_state()
+        self.assertEqual(state.subnet, "10.0.0.0/24")
+        self.assertFalse(state.is_scanning)
+        self.assertEqual(len(repo.get_devices()), 0)
+        repo.close()
+
+    def test_sqlite_repository_merging_retention_and_presence(self):
+        repo = SqliteDeviceRepository(db_path=":memory:", initial_subnet="10.0.0.0/24")
+
+        # Pass 1: Phone is awake, identified as Badunkadunk
+        dev1 = Device(
+            ip="10.0.0.18",
+            mac="82:11:02:26:FA:0F",
+            hostname="Badunkadunk",
+            source=HostnameSource.MDNS,
+            vendor="Apple iOS Device (Private MAC)",
+            last_seen="01:00:00",
+            category=DeviceCategory.MOBILE,
+        )
+        repo.save_devices([dev1])
+        devs1 = repo.get_devices()
+        self.assertEqual(devs1["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertEqual(devs1["10.0.0.18"].category, DeviceCategory.MOBILE)
+        self.assertTrue(devs1["10.0.0.18"].is_online)
+        self.assertTrue(devs1["10.0.0.18"].is_new)
+
+        # Pass 2: Phone screen locked, returns Unknown hostname
+        dev2 = Device(
+            ip="10.0.0.18",
+            mac="82:11:02:26:FA:0F",
+            hostname="Unknown",
+            source=HostnameSource.UNKNOWN,
+            vendor="Private/Randomized MAC",
+            last_seen="01:00:30",
+            category=DeviceCategory.GENERIC,
+        )
+        repo.save_devices([dev2])
+        devs2 = repo.get_devices()
+        self.assertEqual(devs2["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertEqual(devs2["10.0.0.18"].vendor, "Apple iOS Device (Private MAC)")
+        self.assertEqual(devs2["10.0.0.18"].category, DeviceCategory.MOBILE)
+        self.assertEqual(devs2["10.0.0.18"].last_seen, "01:00:30")
+        self.assertTrue(devs2["10.0.0.18"].is_online)
+
+        # Pass 3: Phone misses sweep; another device active
+        repo.save_devices([Device(ip="10.0.0.139", mac="CC:15:31:E5:BB:DB", hostname="PAPPA-CPPC")])
+        devs3 = repo.get_devices()
+        self.assertEqual(len(devs3), 2)
+        self.assertFalse(devs3["10.0.0.18"].is_online, "Sleeping device must transition to is_online=False")
+        self.assertEqual(devs3["10.0.0.18"].hostname, "Badunkadunk")
+        self.assertTrue(devs3["10.0.0.139"].is_online)
+
+        # Test state updates
+        updated_state = repo.update_scan_state(
+            total_found=2,
+            online_count=1,
+            offline_count=1,
+            last_scan_time="01:01:00",
+        )
+        self.assertEqual(updated_state.total_found, 2)
+        self.assertEqual(updated_state.online_count, 1)
+        self.assertEqual(updated_state.offline_count, 1)
+
+        # Test clear
+        repo.clear_devices()
+        self.assertEqual(len(repo.get_devices()), 0)
+        repo.close()
+
+    def test_sqlite_repository_persistence_across_instances(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+            db_file = tmp.name
+
+            # Instance 1: Write device
+            repo1 = SqliteDeviceRepository(db_path=db_file, initial_subnet="10.0.0.0/24")
+            repo1.save_devices([
+                Device(
+                    ip="10.0.0.18",
+                    mac="82:11:02:26:FA:0F",
+                    hostname="Badunkadunk",
+                    source=HostnameSource.MDNS,
+                    vendor="Apple, Inc. (iOS)",
+                    category=DeviceCategory.MOBILE,
+                    last_seen="12:00:00",
+                    first_seen="11:50:00",
+                )
+            ])
+            repo1.update_scan_state(total_found=1, online_count=1, offline_count=0, last_scan_time="12:00:00")
+            repo1.close()
+
+            # Instance 2: Open same DB file (simulating app restart)
+            repo2 = SqliteDeviceRepository(db_path=db_file, initial_subnet="10.0.0.0/24")
+            devs = repo2.get_devices()
+            self.assertEqual(len(devs), 1)
+            self.assertIn("10.0.0.18", devs)
+            self.assertEqual(devs["10.0.0.18"].hostname, "Badunkadunk")
+            self.assertEqual(devs["10.0.0.18"].vendor, "Apple, Inc. (iOS)")
+            self.assertEqual(devs["10.0.0.18"].category, DeviceCategory.MOBILE)
+            self.assertEqual(devs["10.0.0.18"].first_seen, "11:50:00")
+            self.assertEqual(devs["10.0.0.18"].last_seen, "12:00:00")
+
+            state = repo2.get_scan_state()
+            self.assertEqual(state.total_found, 1)
+            self.assertEqual(state.online_count, 1)
+            self.assertEqual(state.last_scan_time, "12:00:00")
+            repo2.close()
+
+    def test_sqlite_repository_thread_safety(self):
+        repo = SqliteDeviceRepository(db_path=":memory:", initial_subnet="10.0.0.0/24")
+
+        def writer():
+            for i in range(50):
+                repo.save_devices([Device(ip=f"10.0.0.{i}", mac="AA:AA:AA:AA:AA:AA")])
+
+        def reader():
+            for _ in range(50):
+                _ = repo.get_devices()
+
+        threads = [threading.Thread(target=writer), threading.Thread(target=reader)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertIsInstance(repo.get_devices(), dict)
+        repo.close()
 
 
 class TestPresentationLayer(unittest.TestCase):

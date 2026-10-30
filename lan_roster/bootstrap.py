@@ -7,7 +7,7 @@ from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
 from lan_roster.adapters.resolvers.dns import SocketDNSResolver
 from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
-from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
+from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
 from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
@@ -25,7 +25,7 @@ def bootstrap():
     default_subnet = network_config.detect_default_subnet()
     default_gateway = network_config.detect_default_gateway()
 
-    device_repository = InMemoryDeviceRepository(initial_subnet=default_subnet)
+    device_repository = SqliteDeviceRepository(initial_subnet=default_subnet)
     manufacturer_repository = HybridManufacturerRepository()
     network_scanner = ScapyArpScanner(timeout=2)
 
