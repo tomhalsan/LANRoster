@@ -1,5 +1,6 @@
 import threading
 from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
+from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
@@ -12,6 +13,7 @@ from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
+from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
 from lan_roster.ui.web import create_web_app
 
 
@@ -53,14 +55,21 @@ def bootstrap():
     )
 
     # 2. Use Cases (Application Services)
+    service_scanner = SocketServiceScanner(timeout=0.2, max_workers=20)
+
     scan_network_use_case = ScanNetworkUseCase(
         scanner=network_scanner,
         resolver=composite_resolver,
         manufacturer_repo=manufacturer_repository,
         device_repo=device_repository,
+        service_scanner=service_scanner,
     )
     get_devices_use_case = GetDevicesUseCase(device_repo=device_repository)
     update_subnet_use_case = UpdateSubnetUseCase(device_repo=device_repository)
+    scan_device_ports_use_case = ScanDevicePortsUseCase(
+        service_scanner=service_scanner,
+        device_repo=device_repository,
+    )
 
     # 3. Scanner synchronization trigger
     scan_trigger = threading.Event()
@@ -85,6 +94,7 @@ def bootstrap():
         get_devices_use_case=get_devices_use_case,
         update_subnet_use_case=update_subnet_use_case,
         scan_trigger=scan_trigger,
+        scan_device_ports_use_case=scan_device_ports_use_case,
     )
 
     return flask_app

@@ -15,11 +15,13 @@ from lan_roster.domain.exceptions import (
 from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
+from lan_roster.ports.service_scanner import ServiceScannerPort
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
 from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
+from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
 from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
@@ -27,6 +29,7 @@ from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
+from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
 from lan_roster.ui.web import create_web_app
 
 
@@ -954,6 +957,174 @@ class TestEndToEndWorkflow(unittest.TestCase):
         self.assertEqual(len(devs_new), 1)
         self.assertEqual(devs_new["192.168.1.1"].category, DeviceCategory.NETWORK)
         self.assertEqual(state_new.total_found, 1)
+
+
+class TestFeature3ExpandableDeviceDrawer(unittest.TestCase):
+    """Tests for Feature 3: Expandable Device Drawer, Port Inspection & Shortcuts."""
+
+    def test_device_open_ports_and_services_mapping(self):
+        dev = Device(
+            ip="10.0.0.1",
+            mac="AA:BB:CC:DD:EE:01",
+            open_ports=[80, 443, 22, 9999],
+        )
+        self.assertEqual(dev.open_ports, [80, 443, 22, 9999])
+        self.assertIn(80, dev.detected_services)
+        self.assertEqual(dev.detected_services[80], "HTTP (Web Admin)")
+        self.assertEqual(dev.detected_services[443], "HTTPS (Secure Web)")
+        self.assertEqual(dev.detected_services[22], "SSH (Terminal)")
+        self.assertEqual(dev.detected_services[9999], "Port 9999")
+
+        d_dict = dev.to_dict()
+        self.assertEqual(d_dict["open_ports"], [80, 443, 22, 9999])
+        self.assertIn("services", d_dict)
+        self.assertEqual(d_dict["services"][80], "HTTP (Web Admin)")
+
+    def test_socket_service_scanner_with_mock_socket(self):
+        scanner = SocketServiceScanner(timeout=0.1, max_workers=2)
+
+        def mock_connect_ex(addr):
+            ip, port = addr
+            return 0 if port in (80, 443) else 111
+
+        with patch("socket.socket") as mock_sock_cls:
+            mock_sock = MagicMock()
+            mock_sock.connect_ex.side_effect = mock_connect_ex
+            mock_sock_cls.return_value.__enter__.return_value = mock_sock
+
+            open_ports = scanner.scan_ports("10.0.0.1", ports=[80, 22, 443])
+            self.assertEqual(open_ports, [80, 443])
+
+            batch = scanner.scan_ports_batch(["10.0.0.1", "10.0.0.2"], ports=[80, 22])
+            self.assertEqual(batch["10.0.0.1"], [80])
+            self.assertEqual(batch["10.0.0.2"], [80])
+
+    def test_sqlite_repository_open_ports_persistence_and_retention(self):
+        repo = SqliteDeviceRepository(db_path=":memory:")
+        dev = Device(
+            ip="10.0.0.1",
+            mac="AA:BB:CC:DD:EE:01",
+            hostname="router.local",
+            open_ports=[80, 443],
+        )
+        repo.save_devices([dev])
+
+        devs = repo.get_devices()
+        self.assertIn("10.0.0.1", devs)
+        self.assertEqual(devs["10.0.0.1"].open_ports, [80, 443])
+
+        # Second sweep where device misses ARP (asleep) — open_ports must remain intact
+        repo.save_devices([])
+        devs_asleep = repo.get_devices()
+        self.assertFalse(devs_asleep["10.0.0.1"].is_online)
+        self.assertEqual(devs_asleep["10.0.0.1"].open_ports, [80, 443])
+        repo.close()
+
+    def test_in_memory_repository_open_ports_retention(self):
+        repo = InMemoryDeviceRepository()
+        dev = Device(
+            ip="10.0.0.50",
+            mac="AA:BB:CC:DD:EE:50",
+            open_ports=[22, 445],
+        )
+        repo.save_devices([dev])
+        self.assertEqual(repo.get_devices()["10.0.0.50"].open_ports, [22, 445])
+
+        # Offline transition retains open_ports
+        repo.save_devices([])
+        self.assertFalse(repo.get_devices()["10.0.0.50"].is_online)
+        self.assertEqual(repo.get_devices()["10.0.0.50"].open_ports, [22, 445])
+
+    def test_scan_device_ports_use_case_success_and_error(self):
+        repo = InMemoryDeviceRepository()
+        repo.save_devices([
+            Device(ip="10.0.0.1", mac="AA:BB:CC:DD:EE:01", hostname="router.local")
+        ])
+
+        mock_scanner = MagicMock(spec=ServiceScannerPort)
+        mock_scanner.scan_ports.return_value = [80, 443]
+
+        uc = ScanDevicePortsUseCase(service_scanner=mock_scanner, device_repo=repo)
+        result = uc.execute("10.0.0.1")
+
+        self.assertEqual(result, [80, 443])
+        self.assertEqual(repo.get_devices()["10.0.0.1"].open_ports, [80, 443])
+
+        # Exception on unknown IP
+        with self.assertRaises(LANRosterException):
+            uc.execute("10.0.0.99")
+
+    def test_scan_network_use_case_integrates_service_scanner(self):
+        scanner = DummyScanner([("10.0.0.1", "AA:BB:CC:DD:EE:01")])
+        resolver = DummyResolver({"10.0.0.1": ("router.local", HostnameSource.MDNS)})
+        manuf_repo = DummyManufacturerRepo()
+        device_repo = InMemoryDeviceRepository()
+
+        mock_service_scanner = MagicMock(spec=ServiceScannerPort)
+        mock_service_scanner.scan_ports_batch.return_value = {"10.0.0.1": [80, 8080]}
+
+        scan_uc = ScanNetworkUseCase(
+            scanner=scanner,
+            resolver=resolver,
+            manufacturer_repo=manuf_repo,
+            device_repo=device_repo,
+            service_scanner=mock_service_scanner,
+        )
+        devices = scan_uc.execute()
+        self.assertEqual(len(devices), 1)
+        self.assertEqual(devices[0].open_ports, [80, 8080])
+
+    def test_web_ui_and_api_drawer_integration(self):
+        repo = InMemoryDeviceRepository()
+        repo.save_devices([
+            Device(
+                ip="10.0.0.1",
+                mac="AA:BB:CC:DD:EE:01",
+                hostname="router.local",
+                open_ports=[80, 443, 22],
+            )
+        ])
+        get_devices_uc = GetDevicesUseCase(device_repo=repo)
+        update_subnet_uc = UpdateSubnetUseCase(device_repo=repo)
+        mock_service_scanner = MagicMock(spec=ServiceScannerPort)
+        mock_service_scanner.scan_ports.return_value = [80, 443, 22]
+        scan_ports_uc = ScanDevicePortsUseCase(
+            service_scanner=mock_service_scanner,
+            device_repo=repo,
+        )
+
+        app = create_web_app(
+            get_devices_use_case=get_devices_uc,
+            update_subnet_use_case=update_subnet_uc,
+            scan_trigger=threading.Event(),
+            scan_device_ports_use_case=scan_ports_uc,
+        )
+        client = app.test_client()
+
+        # Check HTML Dashboard contains drawer rows, copy buttons, web admin link, and scripts
+        resp = client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode("utf-8")
+        self.assertIn("device-row", html)
+        self.assertIn("drawer-row", html)
+        self.assertIn("drawer-chevron", html)
+        self.assertIn("toggleDrawer", html)
+        self.assertIn("copyText", html)
+        self.assertIn("scanPorts", html)
+        self.assertIn("Open Web Admin", html)
+        self.assertIn("service-pill", html)
+
+        # Check API on-demand port scan endpoint
+        api_resp = client.post("/api/device/10.0.0.1/scan-ports")
+        self.assertEqual(api_resp.status_code, 200)
+        api_data = api_resp.get_json()
+        self.assertTrue(api_data["success"])
+        self.assertEqual(api_data["open_ports"], [80, 443, 22])
+        self.assertIn("80", api_data["services"])
+
+        # Check API returns 400 on invalid IP
+        err_resp = client.post("/api/device/10.0.0.999/scan-ports")
+        self.assertEqual(err_resp.status_code, 400)
 
 
 if __name__ == "__main__":

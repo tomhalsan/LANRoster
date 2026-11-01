@@ -6,12 +6,14 @@ from lan_roster.domain.exceptions import InvalidSubnetException
 from lan_roster.ui.templates import HTML_DASHBOARD_TEMPLATE
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
+from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
 
 
 def create_web_app(
     get_devices_use_case: GetDevicesUseCase,
     update_subnet_use_case: UpdateSubnetUseCase,
     scan_trigger: threading.Event,
+    scan_device_ports_use_case: ScanDevicePortsUseCase | None = None,
 ) -> Flask:
     """Factory creating the Flask web presentation adapter."""
     app = Flask(__name__)
@@ -61,6 +63,23 @@ def create_web_app(
             scan_trigger.set()
             return jsonify({"success": True, "subnet": normalized})
         except InvalidSubnetException as e:
+            return jsonify({"error": str(e)}), 400
+
+    @app.route("/api/device/<ip>/scan-ports", methods=["POST"])
+    def api_scan_device_ports(ip: str):
+        if not scan_device_ports_use_case:
+            return jsonify({"error": "Service scanner not configured"}), 501
+        try:
+            ports = scan_device_ports_use_case.execute(ip)
+            devices, _ = get_devices_use_case.execute()
+            dev = devices.get(ip)
+            return jsonify({
+                "success": True,
+                "ip": ip,
+                "open_ports": ports,
+                "services": dev.detected_services if dev else {},
+            })
+        except Exception as e:
             return jsonify({"error": str(e)}), 400
 
     return app
