@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import threading
@@ -44,9 +45,16 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                 category TEXT NOT NULL DEFAULT 'Generic',
                 first_seen TEXT NOT NULL DEFAULT '',
                 is_online INTEGER NOT NULL DEFAULT 1,
-                is_new INTEGER NOT NULL DEFAULT 0
+                is_new INTEGER NOT NULL DEFAULT 0,
+                open_ports TEXT NOT NULL DEFAULT '[]'
             );
         """)
+
+        # Migration: ensure open_ports column exists in older database files
+        try:
+            cursor.execute("ALTER TABLE devices ADD COLUMN open_ports TEXT NOT NULL DEFAULT '[]';")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS scan_state (
@@ -75,6 +83,12 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
         raw_category = row["category"] or "Generic"
         category = DeviceCategory(raw_category) if raw_category in DeviceCategory._value2member_map_ else DeviceCategory.GENERIC
 
+        raw_ports = row["open_ports"] if "open_ports" in row.keys() else "[]"
+        try:
+            open_ports = json.loads(raw_ports) if raw_ports else []
+        except Exception:
+            open_ports = []
+
         return Device(
             ip=row["ip"],
             mac=row["mac"],
@@ -86,6 +100,7 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
             first_seen=row["first_seen"],
             is_online=bool(row["is_online"]),
             is_new=bool(row["is_new"]),
+            open_ports=open_ports,
         )
 
     def get_devices(self) -> Dict[str, Device]:
@@ -124,11 +139,12 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                         category = existing.category
 
                     first_seen = existing.first_seen or dev.first_seen or dev.last_seen
+                    open_ports = dev.open_ports if dev.open_ports else existing.open_ports
 
                     cursor.execute("""
                         INSERT OR REPLACE INTO devices
-                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                     """, (
                         dev.ip,
                         dev.mac or existing.mac,
@@ -139,13 +155,14 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                         category.value,
                         first_seen,
                         1 if existing.is_new else 0,
+                        json.dumps(open_ports),
                     ))
                 else:
                     first_seen = dev.first_seen or dev.last_seen
                     cursor.execute("""
                         INSERT OR REPLACE INTO devices
-                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
+                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)
                     """, (
                         dev.ip,
                         dev.mac,
@@ -155,6 +172,7 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                         dev.last_seen,
                         dev.category.value,
                         first_seen,
+                        json.dumps(dev.open_ports),
                     ))
 
             # 2. Mark devices that missed this sweep as offline/asleep

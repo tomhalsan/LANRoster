@@ -14,22 +14,17 @@ This document tracks upcoming planned features and architectural enhancements fo
   - **Real-Time Counters**: Displays online vs. asleep counts in the dashboard header.
 - **SQLite Database Persistence**:
   - `SqliteDeviceRepository`: Durable SQLite storage at `~/.lan_roster/lan_roster.db` with WAL mode.
-  - Device identities, hostnames, and timestamps survive app restarts.
+  - Device identities, hostnames, timestamps, and detected open ports survive app restarts.
+- **Feature 3: Expandable Device Drawer & One-Click Port Shortcuts**:
+  - **Interactive Drawer**: Clicking any device row smoothly toggles an inspection panel below it.
+  - **1-Click Copy Shortcuts**: Copy buttons for IP and MAC address with visual "✓ Copied!" feedback.
+  - **1-Click Web Launch**: One-click shortcuts to web admin consoles (HTTP/HTTPS) and SSH copy.
+  - **Verified Services & Port Scanner**: High-speed concurrent TCP service scanner (`SocketServiceScanner`) detecting HTTP, HTTPS, SSH, SMB, IPP, Cast, and Apple Lockdown.
+  - **On-Demand Inspection**: `POST /api/device/<ip>/scan-ports` endpoint and "⚡ Re-scan" button in drawer with real-time UI updates.
 
 ---
 
 ## 📋 Feature Backlog
-
-### Feature 3: Expandable Device Drawer & One-Click Port Shortcuts
-- **Interactive Device Drawer**: Click on any device row to slide open an inspection panel.
-- **Detected Services Badges**: Display verified active services (HTTP, HTTPS, SSH, SMB, Apple Lockdown, Google Cast, IPP).
-- **One-Click Web Launch**: Render clickable links directly to administrative consoles (e.g. `http://10.0.0.1` for router, printer web UI, NAS portals).
-- **Quick Clipboard Copy**: One-click copy buttons for MAC address and IP address for quick router DHCP reservation setup.
-- **Clean Architecture Plan**:
-  - `ports/scanner.py` & `use_cases`: Expose detected open ports/services on `Device`.
-  - `ui/templates.py`: HTMX or CSS-based collapsible drawer with action buttons.
-
----
 
 ### Feature 4: Custom Device Nicknames & Notes (Persistent Aliases)
 - **User Overrides**: Allow users to assign friendly custom names (e.g. "Dad's Gaming Rig", "Living Room Apple TV", "Basement Thermostat") overriding or augmenting auto-discovered hostnames.

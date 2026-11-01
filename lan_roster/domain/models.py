@@ -1,6 +1,18 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+
+COMMON_SERVICES: Dict[int, str] = {
+    80: "HTTP (Web Admin)",
+    443: "HTTPS (Secure Web)",
+    22: "SSH (Terminal)",
+    445: "SMB (File Sharing)",
+    631: "IPP (Printer)",
+    8008: "Google Cast",
+    8080: "HTTP-Alt (Web Admin)",
+    62078: "Apple Lockdown",
+}
 
 
 class HostnameSource(str, Enum):
@@ -57,6 +69,12 @@ class Device:
     first_seen: str = ""
     is_online: bool = True
     is_new: bool = False
+    open_ports: List[int] = field(default_factory=list)
+
+    @property
+    def detected_services(self) -> Dict[int, str]:
+        """Returns map of open port -> readable service name."""
+        return {p: COMMON_SERVICES.get(p, f"Port {p}") for p in sorted(self.open_ports)}
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes entity to dictionary for JSON API responses and template rendering."""
@@ -72,6 +90,8 @@ class Device:
             "is_new": self.is_new,
             "category": self.category.value,
             "category_icon": self.category.icon,
+            "open_ports": list(self.open_ports),
+            "services": self.detected_services,
         }
 
 

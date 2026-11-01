@@ -233,7 +233,23 @@ HTML_DASHBOARD_TEMPLATE = """
         .badge-ssdp { background: #ffedd5; color: var(--orange); }
         .badge-dns { background: #dcfce7; color: var(--success); }
         .badge-http { background: #e0e7ff; color: #4338ca; }
-        .badge-firewalled { background: #fef3c7; color: #b45309; }
+        .badge-firewalled {
+            background: #fef3c7;
+            color: #b45309;
+            height: auto;
+            min-height: 20px;
+            padding: 2px 6px;
+            line-height: 1.15;
+            text-align: center;
+            display: inline-flex;
+            flex-direction: column;
+            white-space: nowrap;
+            font-size: 0.68rem;
+        }
+        .badge-firewalled span:last-child {
+            font-size: 0.60rem;
+            opacity: 0.9;
+        }
         .badge-new {
             background: #fef08a;
             color: #854d0e;
@@ -429,6 +445,165 @@ HTML_DASHBOARD_TEMPLATE = """
             padding: 1px 4px;
             border-radius: 4px;
         }
+
+        /* Feature 3: Expandable Device Drawer */
+        tbody tr.device-row {
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s ease;
+        }
+        tbody tr.device-row:hover {
+            background: #f8fafc;
+        }
+        tbody tr.device-row.expanded {
+            background: #f1f5f9;
+        }
+        .drawer-chevron {
+            display: inline-block;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            transition: transform 0.2s ease, color 0.2s ease;
+            width: 14px;
+            text-align: center;
+        }
+        .drawer-chevron.open, tbody tr.device-row.expanded .drawer-chevron {
+            transform: rotate(90deg);
+            color: var(--primary);
+        }
+        .drawer-row td {
+            padding: 0 !important;
+            background: #f8fafc;
+            border-bottom: 2px solid var(--border);
+        }
+        .drawer-panel {
+            padding: 16px 20px 20px 24px;
+            border-left: 4px solid var(--primary);
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        .drawer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .drawer-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .drawer-card-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .drawer-action-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #1e293b;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .action-btn:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+        .action-btn.web-btn {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+        .action-btn.web-btn:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+        .action-btn.copy-btn.copied {
+            background: #dcfce7 !important;
+            color: #15803d !important;
+            border-color: #86efac !important;
+        }
+        .services-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-height: 32px;
+        }
+        .service-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        .service-http, .service-httpalt { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .service-https { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .service-ssh { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+        .service-smb { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+        .service-ipp { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .service-cast { background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; }
+        .service-apple { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+        .service-other { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+        .service-empty {
+            color: #94a3b8;
+            font-size: 0.82rem;
+            font-style: italic;
+        }
+        .btn-rescan-ports {
+            font-size: 0.74rem;
+            font-weight: 600;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-rescan-ports:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .timeline-details {
+            font-size: 0.83rem;
+            color: #475569;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .timeline-details div {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed #f1f5f9;
+            padding-bottom: 4px;
+        }
+        .timeline-details div:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -511,12 +686,15 @@ HTML_DASHBOARD_TEMPLATE = """
                 </thead>
                 <tbody id="devicesTable">
                     {% for ip, device in devices.items() %}
-                    <tr>
+                    <tr class="device-row" onclick="toggleDrawer('{{ ip }}')" id="row-{{ ip }}">
                         <td>
-                            <span class="cat-badge cat-{{ device.category.value.lower().replace(' ', '-') if device.category else 'generic' }}">
-                                <span class="cat-icon">{{ device.category.icon if device.category else '📟' }}</span>
-                                <span>{{ device.category.value if device.category else 'Generic' }}</span>
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="drawer-chevron" id="chevron-{{ ip }}">▸</span>
+                                <span class="cat-badge cat-{{ device.category.value.lower().replace(' ', '-') if device.category else 'generic' }}">
+                                    <span class="cat-icon">{{ device.category.icon if device.category else '📟' }}</span>
+                                    <span>{{ device.category.value if device.category else 'Generic' }}</span>
+                                </span>
+                            </div>
                         </td>
                         <td class="ip">
                             <div class="ip-cell">
@@ -532,9 +710,11 @@ HTML_DASHBOARD_TEMPLATE = """
                                 <span class="badge badge-new" title="First detected at {{ device.first_seen }}">New</span>
                                 {% endif %}
                                 {% if device.source.value %}
-                                <span class="badge badge-{{ device.source.value.lower() }}">
-                                    {% if device.source.value == 'Firewalled' %}Windows (Firewalled){% else %}{{ device.source.value }}{% endif %}
-                                </span>
+                                    {% if device.source.value == 'Firewalled' %}
+                                    <span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>
+                                    {% else %}
+                                    <span class="badge badge-{{ device.source.value.lower() }}">{{ device.source.value }}</span>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </td>
@@ -546,6 +726,55 @@ HTML_DASHBOARD_TEMPLATE = """
                             {% else %}
                             <span class="time-offline" title="Last seen at {{ device.last_seen }}">⚪ Asleep ({{ device.last_seen }})</span>
                             {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="drawer-row" id="drawer-{{ ip }}" style="display: none;" onclick="event.stopPropagation()">
+                        <td colspan="6">
+                            <div class="drawer-panel">
+                                <div class="drawer-grid">
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title">Quick Actions & Shortcuts</div>
+                                        <div class="drawer-action-group">
+                                            <button type="button" class="action-btn copy-btn" onclick="copyText('{{ ip }}', this)">📋 Copy IP ({{ ip }})</button>
+                                            <button type="button" class="action-btn copy-btn" onclick="copyText('{{ device.mac }}', this)">📋 Copy MAC</button>
+                                            {% if 80 in device.open_ports or 8080 in device.open_ports or ip.endswith('.1') %}
+                                            <a href="http://{{ ip }}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🌐 Open Web Admin (http://{{ ip }}) ↗</a>
+                                            {% endif %}
+                                            {% if 443 in device.open_ports %}
+                                            <a href="https://{{ ip }}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🔒 Open HTTPS Admin (https://{{ ip }}) ↗</a>
+                                            {% endif %}
+                                            {% if 22 in device.open_ports %}
+                                            <button type="button" class="action-btn" onclick="copyText('ssh {{ ip }}', this)">💻 Copy SSH: ssh {{ ip }}</button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span>Verified Services & Ports</span>
+                                            <button type="button" class="btn-rescan-ports" id="rescan-{{ ip }}" onclick="scanPorts('{{ ip }}', this)">⚡ Re-scan</button>
+                                        </div>
+                                        <div class="services-container" id="services-{{ ip }}">
+                                            {% if device.open_ports %}
+                                                {% for p in device.open_ports %}
+                                                <span class="service-pill service-{{ 'http' if p in (80, 8080) else ('https' if p == 443 else ('ssh' if p == 22 else ('smb' if p == 445 else ('ipp' if p == 631 else ('cast' if p == 8008 else ('apple' if p == 62078 else 'other')))))) }}">
+                                                    {{ '🌐' if p in (80, 8080) else ('🔒' if p == 443 else ('💻' if p == 22 else ('📁' if p == 445 else ('🖨️' if p == 631 else ('📺' if p == 8008 else ('📱' if p == 62078 else '⚡')))))) }} {{ p }} / {{ device.detected_services.get(p, 'Port ' ~ p) }}
+                                                </span>
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="service-empty">No standard ports open</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title">Discovery Timeline</div>
+                                        <div class="timeline-details">
+                                            <div><strong>First Seen:</strong> <span>{{ device.first_seen or 'Current Session' }}</span></div>
+                                            <div><strong>Last Seen:</strong> <span>{{ device.last_seen or 'Unknown' }}</span></div>
+                                            <div><strong>Protocol Source:</strong> <span>{{ device.source.value or 'Standard Discovery' }}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
@@ -601,7 +830,7 @@ HTML_DASHBOARD_TEMPLATE = """
                     </div>
                 </div>
                 <div class="legend-item">
-                    <span class="badge badge-firewalled">Windows (Firewalled)</span>
+                    <span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>
                     <div class="legend-desc">
                         <strong>Stealth Firewall:</strong> Known PC manufacturer whose firewall dropped discovery probes without answering.
                     </div>
@@ -645,6 +874,87 @@ HTML_DASHBOARD_TEMPLATE = """
     </div>
 
     <script>
+        const expandedIps = new Set();
+
+        function toggleDrawer(ip) {
+            if (expandedIps.has(ip)) {
+                expandedIps.delete(ip);
+            } else {
+                expandedIps.add(ip);
+            }
+            const drawer = document.getElementById(`drawer-${ip}`);
+            const row = document.getElementById(`row-${ip}`);
+            const chevron = document.getElementById(`chevron-${ip}`);
+            const isExp = expandedIps.has(ip);
+            if (drawer) drawer.style.display = isExp ? 'table-row' : 'none';
+            if (row) row.classList.toggle('expanded', isExp);
+            if (chevron) chevron.classList.toggle('open', isExp);
+        }
+
+        function copyText(text, btn) {
+            if (window.event) window.event.stopPropagation();
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                console.error("Copy failed", err);
+            });
+        }
+
+        function scanPorts(ip, btn) {
+            if (window.event) window.event.stopPropagation();
+            btn.disabled = true;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '⏳ Scanning...';
+            fetch(`/api/device/${encodeURIComponent(ip)}/scan-ports`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Done!';
+                    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                    if (data.success && data.open_ports) {
+                        const container = document.getElementById(`services-${ip}`);
+                        if (container) {
+                            if (data.open_ports.length === 0) {
+                                container.innerHTML = '<span class="service-empty">No standard ports open</span>';
+                            } else {
+                                container.innerHTML = renderServicesList(data.open_ports, data.services);
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error("Scan ports error:", err);
+                    btn.disabled = false;
+                    btn.innerHTML = '⚠️ Error';
+                    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                });
+        }
+
+        function renderServicesList(ports, services) {
+            if (!ports || ports.length === 0) {
+                return '<span class="service-empty">No standard ports open</span>';
+            }
+            return ports.map(p => {
+                const sName = (services && services[p]) ? services[p] : `Port ${p}`;
+                let sClass = 'other';
+                let icon = '⚡';
+                if (p === 80 || p === 8080) { sClass = 'http'; icon = '🌐'; }
+                else if (p === 443) { sClass = 'https'; icon = '🔒'; }
+                else if (p === 22) { sClass = 'ssh'; icon = '💻'; }
+                else if (p === 445) { sClass = 'smb'; icon = '📁'; }
+                else if (p === 631) { sClass = 'ipp'; icon = '🖨️'; }
+                else if (p === 8008) { sClass = 'cast'; icon = '📺'; }
+                else if (p === 62078) { sClass = 'apple'; icon = '📱'; }
+                return `<span class="service-pill service-${sClass}">${icon} ${p} / ${sName}</span>`;
+            }).join('');
+        }
+
         async function refreshData() {
             try {
                 const res = await fetch('/api/devices');
@@ -711,13 +1021,13 @@ HTML_DASHBOARD_TEMPLATE = """
                 for (const ip of sortedIps) {
                     const info = data.devices[ip];
                     const isPrivate = info.vendor.includes('Private') ? 'vendor-private' : '';
-                    let badgeLabel = info.source;
+                    const badgeLabel = info.source === 'Firewalled' ? 'Windows (Firewalled)' : (info.source || 'Standard Discovery');
+                    let badgeHtml = '';
                     if (info.source === 'Firewalled') {
-                        badgeLabel = 'Windows (Firewalled)';
+                        badgeHtml = '<span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>';
+                    } else if (info.source) {
+                        badgeHtml = `<span class="badge badge-${info.source.toLowerCase()}">${info.source}</span>`;
                     }
-                    const badgeHtml = info.source 
-                        ? `<span class="badge badge-${info.source.toLowerCase()}">${badgeLabel}</span>` 
-                        : '';
 
                     const catClass = (info.category || 'Generic').toLowerCase().replace(/\\s+/g, '-');
                     const catIcon = info.category_icon || '📟';
@@ -731,12 +1041,22 @@ HTML_DASHBOARD_TEMPLATE = """
                         ? `<span class="time-online" title="Last active at ${info.last_seen}">🟢 Online</span>` 
                         : `<span class="time-offline" title="Last seen at ${info.last_seen}">⚪ Asleep (${info.last_seen})</span>`;
 
-                    html += `<tr>
+                    const isExp = expandedIps.has(ip);
+                    const openPorts = info.open_ports || [];
+                    const hasHttp = openPorts.includes(80) || openPorts.includes(8080) || ip.endsWith('.1');
+                    const hasHttps = openPorts.includes(443);
+                    const hasSsh = openPorts.includes(22);
+                    const servicesHtml = renderServicesList(openPorts, info.services);
+
+                    html += `<tr class="device-row ${isExp ? 'expanded' : ''}" onclick="toggleDrawer('${ip}')" id="row-${ip}">
                         <td>
-                            <span class="cat-badge cat-${catClass}">
-                                <span class="cat-icon">${catIcon}</span>
-                                <span>${catVal}</span>
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="drawer-chevron ${isExp ? 'open' : ''}" id="chevron-${ip}">▸</span>
+                                <span class="cat-badge cat-${catClass}">
+                                    <span class="cat-icon">${catIcon}</span>
+                                    <span>${catVal}</span>
+                                </span>
+                            </div>
                         </td>
                         <td class="ip">
                             <div class="ip-cell">
@@ -754,6 +1074,41 @@ HTML_DASHBOARD_TEMPLATE = """
                         <td class="vendor ${isPrivate}">${info.vendor}</td>
                         <td class="mac">${info.mac}</td>
                         <td class="time">${timeHtml}</td>
+                    </tr>
+                    <tr class="drawer-row" id="drawer-${ip}" style="display: ${isExp ? 'table-row' : 'none'};" onclick="event.stopPropagation()">
+                        <td colspan="6">
+                            <div class="drawer-panel">
+                                <div class="drawer-grid">
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title">Quick Actions & Shortcuts</div>
+                                        <div class="drawer-action-group">
+                                            <button type="button" class="action-btn copy-btn" onclick="copyText('${ip}', this)">📋 Copy IP (${ip})</button>
+                                            <button type="button" class="action-btn copy-btn" onclick="copyText('${info.mac}', this)">📋 Copy MAC</button>
+                                            ${hasHttp ? `<a href="http://${ip}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🌐 Open Web Admin (http://${ip}) ↗</a>` : ''}
+                                            ${hasHttps ? `<a href="https://${ip}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🔒 Open HTTPS Admin (https://${ip}) ↗</a>` : ''}
+                                            ${hasSsh ? `<button type="button" class="action-btn" onclick="copyText('ssh ${ip}', this)">💻 Copy SSH: ssh ${ip}</button>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span>Verified Services & Ports</span>
+                                            <button type="button" class="btn-rescan-ports" id="rescan-${ip}" onclick="scanPorts('${ip}', this)">⚡ Re-scan</button>
+                                        </div>
+                                        <div class="services-container" id="services-${ip}">
+                                            ${servicesHtml}
+                                        </div>
+                                    </div>
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title">Discovery Timeline</div>
+                                        <div class="timeline-details">
+                                            <div><strong>First Seen:</strong> <span>${info.first_seen || 'Current Session'}</span></div>
+                                            <div><strong>Last Seen:</strong> <span>${info.last_seen || 'Unknown'}</span></div>
+                                            <div><strong>Protocol Source:</strong> <span>${badgeLabel || 'Standard Discovery'}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>`;
                 }
                 tbody.innerHTML = html;

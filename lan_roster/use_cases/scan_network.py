@@ -7,6 +7,7 @@ from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.repository import DeviceRepositoryPort
+from lan_roster.ports.service_scanner import ServiceScannerPort
 
 
 class ScanNetworkUseCase:
@@ -20,11 +21,13 @@ class ScanNetworkUseCase:
         resolver: HostnameResolverPort,
         manufacturer_repo: ManufacturerRepositoryPort,
         device_repo: DeviceRepositoryPort,
+        service_scanner: ServiceScannerPort | None = None,
     ) -> None:
         self.scanner = scanner
         self.resolver = resolver
         self.manufacturer_repo = manufacturer_repo
         self.device_repo = device_repo
+        self.service_scanner = service_scanner
 
     def execute(self) -> List[Device]:
         state = self.device_repo.get_scan_state()
@@ -49,7 +52,14 @@ class ScanNetworkUseCase:
                             model=meta.get("model", ""),
                         )
 
-            # 3. Assemble domain entities
+            # 3. Optional service/port scanning across active nodes
+            open_ports_map = (
+                self.service_scanner.scan_ports_batch(all_ips)
+                if self.service_scanner
+                else {}
+            )
+
+            # 4. Assemble domain entities
             device_entities: List[Device] = []
             for ip, mac in discovered_nodes:
                 vendor = self.manufacturer_repo.get_manufacturer(mac, ip=ip)
@@ -81,6 +91,7 @@ class ScanNetworkUseCase:
                         first_seen=current_time,
                         category=category,
                         is_online=True,
+                        open_ports=open_ports_map.get(ip, []),
                     )
                 )
 
