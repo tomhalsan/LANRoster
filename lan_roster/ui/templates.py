@@ -233,7 +233,23 @@ HTML_DASHBOARD_TEMPLATE = """
         .badge-ssdp { background: #ffedd5; color: var(--orange); }
         .badge-dns { background: #dcfce7; color: var(--success); }
         .badge-http { background: #e0e7ff; color: #4338ca; }
-        .badge-firewalled { background: #fef3c7; color: #b45309; }
+        .badge-firewalled {
+            background: #fef3c7;
+            color: #b45309;
+            height: auto;
+            min-height: 20px;
+            padding: 2px 6px;
+            line-height: 1.15;
+            text-align: center;
+            display: inline-flex;
+            flex-direction: column;
+            white-space: nowrap;
+            font-size: 0.68rem;
+        }
+        .badge-firewalled span:last-child {
+            font-size: 0.60rem;
+            opacity: 0.9;
+        }
         .badge-new {
             background: #fef08a;
             color: #854d0e;
@@ -694,9 +710,11 @@ HTML_DASHBOARD_TEMPLATE = """
                                 <span class="badge badge-new" title="First detected at {{ device.first_seen }}">New</span>
                                 {% endif %}
                                 {% if device.source.value %}
-                                <span class="badge badge-{{ device.source.value.lower() }}">
-                                    {% if device.source.value == 'Firewalled' %}Windows (Firewalled){% else %}{{ device.source.value }}{% endif %}
-                                </span>
+                                    {% if device.source.value == 'Firewalled' %}
+                                    <span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>
+                                    {% else %}
+                                    <span class="badge badge-{{ device.source.value.lower() }}">{{ device.source.value }}</span>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </td>
@@ -812,7 +830,7 @@ HTML_DASHBOARD_TEMPLATE = """
                     </div>
                 </div>
                 <div class="legend-item">
-                    <span class="badge badge-firewalled">Windows (Firewalled)</span>
+                    <span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>
                     <div class="legend-desc">
                         <strong>Stealth Firewall:</strong> Known PC manufacturer whose firewall dropped discovery probes without answering.
                     </div>
@@ -1003,13 +1021,13 @@ HTML_DASHBOARD_TEMPLATE = """
                 for (const ip of sortedIps) {
                     const info = data.devices[ip];
                     const isPrivate = info.vendor.includes('Private') ? 'vendor-private' : '';
-                    let badgeLabel = info.source;
+                    const badgeLabel = info.source === 'Firewalled' ? 'Windows (Firewalled)' : (info.source || 'Standard Discovery');
+                    let badgeHtml = '';
                     if (info.source === 'Firewalled') {
-                        badgeLabel = 'Windows (Firewalled)';
+                        badgeHtml = '<span class="badge badge-firewalled"><span>Windows</span><span>(Firewalled)</span></span>';
+                    } else if (info.source) {
+                        badgeHtml = `<span class="badge badge-${info.source.toLowerCase()}">${info.source}</span>`;
                     }
-                    const badgeHtml = info.source 
-                        ? `<span class="badge badge-${info.source.toLowerCase()}">${badgeLabel}</span>` 
-                        : '';
 
                     const catClass = (info.category || 'Generic').toLowerCase().replace(/\\s+/g, '-');
                     const catIcon = info.category_icon || '📟';
