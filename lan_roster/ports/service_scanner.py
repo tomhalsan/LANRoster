@@ -19,3 +19,4 @@ class ServiceScannerPort(ABC):
     ) -> Dict[str, List[int]]:
         """Concurrently probes multiple IP addresses for open ports."""
         pass
+

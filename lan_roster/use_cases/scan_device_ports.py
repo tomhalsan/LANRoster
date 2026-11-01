@@ -28,3 +28,4 @@ class ScanDevicePortsUseCase:
         self.device_repo.save_devices([device])
 
         return open_ports
+

@@ -75,3 +75,4 @@ class SocketServiceScanner(ServiceScannerPort):
                     results[ip] = []
 
         return results
+
