@@ -7,6 +7,7 @@ from lan_roster.ui.templates import HTML_DASHBOARD_TEMPLATE
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
+from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
 
 
 def create_web_app(
@@ -14,6 +15,7 @@ def create_web_app(
     update_subnet_use_case: UpdateSubnetUseCase,
     scan_trigger: threading.Event,
     scan_device_ports_use_case: ScanDevicePortsUseCase | None = None,
+    update_device_alias_use_case: UpdateDeviceAliasUseCase | None = None,
 ) -> Flask:
     """Factory creating the Flask web presentation adapter."""
     app = Flask(__name__)
@@ -78,6 +80,33 @@ def create_web_app(
                 "ip": ip,
                 "open_ports": ports,
                 "services": dev.detected_services if dev else {},
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
+    @app.route("/api/device/alias", methods=["POST"])
+    def api_update_device_alias():
+        if not update_device_alias_use_case:
+            return jsonify({"error": "Alias repository not configured"}), 501
+        data = request.get_json(silent=True) or {}
+        mac = data.get("mac", "").strip()
+        nickname = data.get("nickname", "")
+        notes = data.get("notes", "")
+
+        if not mac:
+            return jsonify({"error": "Missing MAC address"}), 400
+
+        try:
+            alias = update_device_alias_use_case.execute(
+                mac=mac,
+                nickname=nickname,
+                notes=notes,
+            )
+            return jsonify({
+                "success": True,
+                "mac": alias.mac,
+                "nickname": alias.nickname,
+                "notes": alias.notes,
             })
         except Exception as e:
             return jsonify({"error": str(e)}), 400

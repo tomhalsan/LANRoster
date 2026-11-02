@@ -46,15 +46,25 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                 first_seen TEXT NOT NULL DEFAULT '',
                 is_online INTEGER NOT NULL DEFAULT 1,
                 is_new INTEGER NOT NULL DEFAULT 0,
-                open_ports TEXT NOT NULL DEFAULT '[]'
+                open_ports TEXT NOT NULL DEFAULT '[]',
+                nickname TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT ''
             );
         """)
 
-        # Migration: ensure open_ports column exists in older database files
+        # Migration: ensure open_ports, nickname, notes columns exist in older database files
         try:
             cursor.execute("ALTER TABLE devices ADD COLUMN open_ports TEXT NOT NULL DEFAULT '[]';")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
+        try:
+            cursor.execute("ALTER TABLE devices ADD COLUMN nickname TEXT NOT NULL DEFAULT '';")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE devices ADD COLUMN notes TEXT NOT NULL DEFAULT '';")
+        except sqlite3.OperationalError:
+            pass
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS scan_state (
@@ -89,6 +99,9 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
         except Exception:
             open_ports = []
 
+        nickname = row["nickname"] if "nickname" in row.keys() and row["nickname"] else ""
+        notes = row["notes"] if "notes" in row.keys() and row["notes"] else ""
+
         return Device(
             ip=row["ip"],
             mac=row["mac"],
@@ -101,6 +114,8 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
             is_online=bool(row["is_online"]),
             is_new=bool(row["is_new"]),
             open_ports=open_ports,
+            nickname=nickname,
+            notes=notes,
         )
 
     def get_devices(self) -> Dict[str, Device]:
@@ -140,11 +155,13 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
 
                     first_seen = existing.first_seen or dev.first_seen or dev.last_seen
                     open_ports = dev.open_ports if dev.open_ports else existing.open_ports
+                    nickname = dev.nickname if dev.nickname else existing.nickname
+                    notes = dev.notes if dev.notes else existing.notes
 
                     cursor.execute("""
                         INSERT OR REPLACE INTO devices
-                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports, nickname, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
                     """, (
                         dev.ip,
                         dev.mac or existing.mac,
@@ -156,13 +173,15 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                         first_seen,
                         1 if existing.is_new else 0,
                         json.dumps(open_ports),
+                        nickname,
+                        notes,
                     ))
                 else:
                     first_seen = dev.first_seen or dev.last_seen
                     cursor.execute("""
                         INSERT OR REPLACE INTO devices
-                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)
+                        (ip, mac, hostname, source, vendor, last_seen, category, first_seen, is_online, is_new, open_ports, nickname, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
                     """, (
                         dev.ip,
                         dev.mac,
@@ -173,6 +192,8 @@ class SqliteDeviceRepository(DeviceRepositoryPort):
                         dev.category.value,
                         first_seen,
                         json.dumps(dev.open_ports),
+                        dev.nickname,
+                        dev.notes,
                     ))
 
             # 2. Mark devices that missed this sweep as offline/asleep

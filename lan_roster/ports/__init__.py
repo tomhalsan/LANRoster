@@ -4,6 +4,7 @@ from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.repository import DeviceRepositoryPort
 from lan_roster.ports.network_config import NetworkConfigPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
+from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 
 __all__ = [
     "NetworkScannerPort",
@@ -12,5 +13,6 @@ __all__ = [
     "DeviceRepositoryPort",
     "NetworkConfigPort",
     "ServiceScannerPort",
+    "DeviceAliasRepositoryPort",
 ]
 

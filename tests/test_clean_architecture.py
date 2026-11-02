@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
 from lan_roster import __version__
-from lan_roster.domain.models import Device, DeviceCategory, HostnameSource, ScanState
+from lan_roster.domain.models import Device, DeviceAlias, DeviceCategory, HostnameSource, ScanState
 from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import (
     LANRosterException,
@@ -16,8 +16,11 @@ from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
+from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
+from lan_roster.adapters.repository.memory_alias import InMemoryAliasRepository
+from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
 from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
@@ -30,6 +33,7 @@ from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
+from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
 from lan_roster.ui.web import create_web_app
 
 
@@ -1125,6 +1129,271 @@ class TestFeature3ExpandableDeviceDrawer(unittest.TestCase):
         # Check API returns 400 on invalid IP
         err_resp = client.post("/api/device/10.0.0.999/scan-ports")
         self.assertEqual(err_resp.status_code, 400)
+
+
+class TestFeature4DeviceNicknamesAndNotes(unittest.TestCase):
+    """
+    Feature 4 Verification: Custom Device Nicknames & Notes (Persistent Aliases).
+    Tests domain models, alias repository adapters (Memory & SQLite),
+    the UpdateDeviceAlias use case, network scan enrichment, and web UI/API integration.
+    """
+
+    def test_domain_device_alias_and_display_name(self):
+        # 1. DeviceAlias entity
+        alias = DeviceAlias(mac="AA:BB:CC:11:22:33", nickname="Living Room Apple TV", notes="Reserved IP 10.0.0.50")
+        self.assertEqual(alias.mac, "AA:BB:CC:11:22:33")
+        self.assertEqual(alias.nickname, "Living Room Apple TV")
+        self.assertEqual(alias.notes, "Reserved IP 10.0.0.50")
+        self.assertEqual(alias.to_dict(), {
+            "mac": "AA:BB:CC:11:22:33",
+            "nickname": "Living Room Apple TV",
+            "notes": "Reserved IP 10.0.0.50",
+        })
+
+        # 2. Device display_name fallback to hostname
+        dev_default = Device(ip="10.0.0.50", mac="AA:BB:CC:11:22:33", hostname="Apple-TV.local")
+        self.assertEqual(dev_default.nickname, "")
+        self.assertEqual(dev_default.notes, "")
+        self.assertEqual(dev_default.display_name, "Apple-TV.local")
+
+        # 3. Device display_name precedence with nickname
+        dev_custom = Device(
+            ip="10.0.0.50",
+            mac="AA:BB:CC:11:22:33",
+            hostname="Apple-TV.local",
+            nickname="Living Room Apple TV",
+            notes="Reserved IP",
+        )
+        self.assertEqual(dev_custom.display_name, "Living Room Apple TV")
+        d_dict = dev_custom.to_dict()
+        self.assertEqual(d_dict["nickname"], "Living Room Apple TV")
+        self.assertEqual(d_dict["notes"], "Reserved IP")
+        self.assertEqual(d_dict["display_name"], "Living Room Apple TV")
+
+    def test_in_memory_alias_repository(self):
+        repo = InMemoryAliasRepository()
+        self.assertIsNone(repo.get_alias("AA:BB:CC:DD:EE:01"))
+        self.assertEqual(repo.get_all_aliases(), {})
+
+        # Save with lowercase MAC
+        saved = repo.save_alias("aa:bb:cc:dd:ee:01", "Gaming Rig", "Connected via Ethernet")
+        self.assertEqual(saved.mac, "AA:BB:CC:DD:EE:01")
+        self.assertEqual(saved.nickname, "Gaming Rig")
+
+        # Fetch case-insensitive
+        fetched = repo.get_alias("Aa:Bb:Cc:Dd:Ee:01")
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.nickname, "Gaming Rig")
+
+        # All aliases
+        all_aliases = repo.get_all_aliases()
+        self.assertIn("AA:BB:CC:DD:EE:01", all_aliases)
+
+        # Delete
+        repo.delete_alias("AA:BB:CC:DD:EE:01")
+        self.assertIsNone(repo.get_alias("AA:BB:CC:DD:EE:01"))
+
+    def test_sqlite_alias_repository_crud_and_persistence(self):
+        import tempfile
+        import os
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_db = tmp.name
+
+        try:
+            repo1 = SqliteAliasRepository(db_path=tmp_db)
+            self.assertIsNone(repo1.get_alias("11:22:33:44:55:66"))
+
+            repo1.save_alias("11:22:33:44:55:66", "Office Printer", "Toner low")
+            fetched = repo1.get_alias("11:22:33:44:55:66")
+            self.assertIsNotNone(fetched)
+            self.assertEqual(fetched.nickname, "Office Printer")
+            self.assertEqual(fetched.notes, "Toner low")
+            repo1.close()
+
+            # Verify persistence in a second instance pointing to the same file
+            repo2 = SqliteAliasRepository(db_path=tmp_db)
+            all_aliases = repo2.get_all_aliases()
+            self.assertIn("11:22:33:44:55:66", all_aliases)
+            self.assertEqual(all_aliases["11:22:33:44:55:66"].nickname, "Office Printer")
+
+            # Update alias
+            repo2.save_alias("11:22:33:44:55:66", "Office LaserJet", "Toner replaced")
+            updated = repo2.get_alias("11:22:33:44:55:66")
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertEqual(updated.nickname, "Office LaserJet")
+
+            # Delete
+            repo2.delete_alias("11:22:33:44:55:66")
+            self.assertIsNone(repo2.get_alias("11:22:33:44:55:66"))
+            repo2.close()
+        finally:
+            if os.path.exists(tmp_db):
+                os.remove(tmp_db)
+
+    def test_device_repositories_preserve_alias_fields(self):
+        # 1. InMemoryDeviceRepository preserves nickname and notes across sweeps
+        mem_repo = InMemoryDeviceRepository()
+        dev1 = Device(ip="10.0.0.10", mac="AA:11:BB:22:CC:33", hostname="host1", nickname="Nick1", notes="Note1")
+        mem_repo.save_devices([dev1])
+
+        # Sweep with same device without losing nickname/notes
+        dev1_sweep = Device(ip="10.0.0.10", mac="AA:11:BB:22:CC:33", hostname="host1-renamed")
+        mem_repo.save_devices([dev1_sweep])
+        saved_mem = mem_repo.get_devices()["10.0.0.10"]
+        self.assertEqual(saved_mem.nickname, "Nick1")
+        self.assertEqual(saved_mem.notes, "Note1")
+
+        # 2. SqliteDeviceRepository preserves nickname and notes
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_db = tmp.name
+
+        try:
+            sql_repo = SqliteDeviceRepository(db_path=tmp_db)
+            sql_repo.save_devices([
+                Device(ip="10.0.0.20", mac="BB:22:CC:33:DD:44", hostname="host2", nickname="Nick2", notes="Note2")
+            ])
+            loaded = sql_repo.get_devices()["10.0.0.20"]
+            self.assertEqual(loaded.nickname, "Nick2")
+            self.assertEqual(loaded.notes, "Note2")
+
+            # Sweep misses device -> marks offline, preserves nickname/notes
+            sql_repo.save_devices([])
+            offline_dev = sql_repo.get_devices()["10.0.0.20"]
+            self.assertFalse(offline_dev.is_online)
+            self.assertEqual(offline_dev.nickname, "Nick2")
+            self.assertEqual(offline_dev.notes, "Note2")
+            sql_repo.close()
+        finally:
+            if os.path.exists(tmp_db):
+                os.remove(tmp_db)
+
+    def test_update_device_alias_use_case(self):
+        alias_repo = InMemoryAliasRepository()
+        device_repo = InMemoryDeviceRepository()
+
+        # Preload device
+        device_repo.save_devices([
+            Device(ip="10.0.0.5", mac="CC:33:DD:44:EE:55", hostname="desktop.local")
+        ])
+
+        use_case = UpdateDeviceAliasUseCase(alias_repo=alias_repo, device_repo=device_repo)
+
+        # Execute customization
+        result = use_case.execute(
+            mac="cc:33:dd:44:ee:55",
+            nickname="Main Workstation",
+            notes="Primary dev machine",
+        )
+        self.assertEqual(result.mac, "CC:33:DD:44:EE:55")
+        self.assertEqual(result.nickname, "Main Workstation")
+        self.assertEqual(result.notes, "Primary dev machine")
+
+        # Verify alias storage
+        stored = alias_repo.get_alias("CC:33:DD:44:EE:55")
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.nickname, "Main Workstation")
+
+        # Verify active device record was updated
+        active_dev = device_repo.get_devices()["10.0.0.5"]
+        self.assertEqual(active_dev.nickname, "Main Workstation")
+        self.assertEqual(active_dev.notes, "Primary dev machine")
+        self.assertEqual(active_dev.display_name, "Main Workstation")
+
+        # Test validation error on empty MAC
+        with self.assertRaises(LANRosterException):
+            use_case.execute(mac="", nickname="No MAC")
+
+    def test_scan_network_use_case_enriches_with_aliases(self):
+        scanner = DummyScanner([("10.0.0.100", "AA:BB:CC:DD:EE:FF")])
+        resolver = DummyResolver({"10.0.0.100": ("unknown.local", HostnameSource.MDNS)})
+        manuf_repo = DummyManufacturerRepo()
+        device_repo = InMemoryDeviceRepository()
+        alias_repo = InMemoryAliasRepository()
+
+        # Pre-assign alias to this MAC
+        alias_repo.save_alias("AA:BB:CC:DD:EE:FF", "Living Room Sonoff", "Smart light switch")
+
+        scan_uc = ScanNetworkUseCase(
+            scanner=scanner,
+            resolver=resolver,
+            manufacturer_repo=manuf_repo,
+            device_repo=device_repo,
+            alias_repo=alias_repo,
+        )
+
+        devices = scan_uc.execute()
+        self.assertEqual(len(devices), 1)
+        dev = devices[0]
+        self.assertEqual(dev.nickname, "Living Room Sonoff")
+        self.assertEqual(dev.notes, "Smart light switch")
+        self.assertEqual(dev.display_name, "Living Room Sonoff")
+
+    def test_web_api_and_ui_alias_customization(self):
+        device_repo = InMemoryDeviceRepository()
+        alias_repo = InMemoryAliasRepository()
+        device_repo.save_devices([
+            Device(
+                ip="10.0.0.42",
+                mac="00:11:22:33:44:55",
+                hostname="pi-hole.local",
+            )
+        ])
+
+        get_devices_uc = GetDevicesUseCase(device_repo=device_repo)
+        update_subnet_uc = UpdateSubnetUseCase(device_repo=device_repo)
+        update_alias_uc = UpdateDeviceAliasUseCase(alias_repo=alias_repo, device_repo=device_repo)
+
+        app = create_web_app(
+            get_devices_use_case=get_devices_uc,
+            update_subnet_use_case=update_subnet_uc,
+            scan_trigger=threading.Event(),
+            update_device_alias_use_case=update_alias_uc,
+        )
+        client = app.test_client()
+
+        # 1. Successful POST /api/device/alias
+        post_resp = client.post("/api/device/alias", json={
+            "mac": "00:11:22:33:44:55",
+            "nickname": "DNS Server",
+            "notes": "Static IP 10.0.0.42",
+        })
+        self.assertEqual(post_resp.status_code, 200)
+        post_data = post_resp.get_json()
+        self.assertTrue(post_data["success"])
+        self.assertEqual(post_data["nickname"], "DNS Server")
+        self.assertEqual(post_data["notes"], "Static IP 10.0.0.42")
+
+        # 2. Missing MAC returns 400
+        bad_resp = client.post("/api/device/alias", json={"nickname": "No MAC"})
+        self.assertEqual(bad_resp.status_code, 400)
+
+        # 3. GET / renders Custom Identity card, nickname highlight, and sub-hostname
+        page_resp = client.get("/")
+        self.assertEqual(page_resp.status_code, 200)
+        html = page_resp.data.decode("utf-8")
+        self.assertIn("Custom Identity & Notes", html)
+        self.assertIn("alias-form", html)
+        self.assertIn("alias-input", html)
+        self.assertIn("saveAlias", html)
+        self.assertIn("nickname-active", html)
+        self.assertIn("sub-hostname", html)
+        self.assertIn("DNS Server", html)
+        self.assertIn("(pi-hole.local)", html)
+        self.assertIn("Static IP 10.0.0.42", html)
+
+        # 4. App without alias usecase returns 501
+        app_no_alias = create_web_app(
+            get_devices_use_case=get_devices_uc,
+            update_subnet_use_case=update_subnet_uc,
+            scan_trigger=threading.Event(),
+        )
+        client_no_alias = app_no_alias.test_client()
+        resp_501 = client_no_alias.post("/api/device/alias", json={"mac": "AA:BB:CC:DD:EE:FF"})
+        self.assertEqual(resp_501.status_code, 501)
 
 
 if __name__ == "__main__":

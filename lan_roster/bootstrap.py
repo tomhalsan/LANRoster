@@ -9,11 +9,13 @@ from lan_roster.adapters.resolvers.dns import SocketDNSResolver
 from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
+from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
 from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
 from lan_roster.use_cases.scan_network import ScanNetworkUseCase
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
+from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
 from lan_roster.ui.web import create_web_app
 
 
@@ -56,6 +58,7 @@ def bootstrap():
 
     # 2. Use Cases (Application Services)
     service_scanner = SocketServiceScanner(timeout=0.2, max_workers=20)
+    alias_repository = SqliteAliasRepository(db_path=device_repository.db_path)
 
     scan_network_use_case = ScanNetworkUseCase(
         scanner=network_scanner,
@@ -63,11 +66,16 @@ def bootstrap():
         manufacturer_repo=manufacturer_repository,
         device_repo=device_repository,
         service_scanner=service_scanner,
+        alias_repo=alias_repository,
     )
     get_devices_use_case = GetDevicesUseCase(device_repo=device_repository)
     update_subnet_use_case = UpdateSubnetUseCase(device_repo=device_repository)
     scan_device_ports_use_case = ScanDevicePortsUseCase(
         service_scanner=service_scanner,
+        device_repo=device_repository,
+    )
+    update_device_alias_use_case = UpdateDeviceAliasUseCase(
+        alias_repo=alias_repository,
         device_repo=device_repository,
     )
 
@@ -95,6 +103,7 @@ def bootstrap():
         update_subnet_use_case=update_subnet_use_case,
         scan_trigger=scan_trigger,
         scan_device_ports_use_case=scan_device_ports_use_case,
+        update_device_alias_use_case=update_device_alias_use_case,
     )
 
     return flask_app

@@ -604,6 +604,78 @@ HTML_DASHBOARD_TEMPLATE = """
         .timeline-details div:last-child {
             border-bottom: none;
         }
+
+        /* Feature 4: Device Nicknames & Notes */
+        .nickname-active {
+            color: #1e293b;
+            font-weight: 700;
+        }
+        .sub-hostname {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+        .notes-indicator {
+            cursor: help;
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+        .alias-form {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .alias-field {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .alias-field label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+        .alias-input {
+            width: 100%;
+            padding: 6px 10px;
+            font-size: 0.84rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.15s;
+            font-family: inherit;
+            background: #ffffff;
+        }
+        .alias-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
+        }
+        .alias-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .alias-save-btn {
+            background: #eff6ff;
+            color: var(--primary);
+            border-color: #bfdbfe;
+            width: auto;
+            padding: 6px 14px;
+            cursor: pointer;
+        }
+        .alias-save-btn:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+        .alias-msg {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--success);
+            transition: opacity 0.2s ease;
+        }
     </style>
 </head>
 <body>
@@ -705,7 +777,15 @@ HTML_DASHBOARD_TEMPLATE = """
                         </td>
                         <td>
                             <div class="hostname-cell">
+                                {% if device.nickname %}
+                                <span class="hostname nickname-active">{{ device.nickname }}</span>
+                                <span class="sub-hostname">({{ device.hostname }})</span>
+                                {% else %}
                                 <span class="hostname">{{ device.hostname }}</span>
+                                {% endif %}
+                                {% if device.notes %}
+                                <span class="notes-indicator" title="{{ device.notes }}">📝</span>
+                                {% endif %}
                                 {% if device.is_new %}
                                 <span class="badge badge-new" title="First detected at {{ device.first_seen }}">New</span>
                                 {% endif %}
@@ -764,6 +844,23 @@ HTML_DASHBOARD_TEMPLATE = """
                                                 <span class="service-empty">No standard ports open</span>
                                             {% endif %}
                                         </div>
+                                    </div>
+                                    <div class="drawer-card">
+                                        <div class="drawer-card-title">Custom Identity & Notes</div>
+                                        <form class="alias-form" onsubmit="event.preventDefault(); saveAlias('{{ device.mac }}', '{{ ip }}', this);">
+                                            <div class="alias-field">
+                                                <label for="nickname-{{ ip }}">Nickname</label>
+                                                <input type="text" id="nickname-{{ ip }}" class="alias-input" value="{{ device.nickname }}" placeholder="e.g. Living Room TV, Dad's PC" autocomplete="off">
+                                            </div>
+                                            <div class="alias-field">
+                                                <label for="notes-{{ ip }}">Notes / Tag</label>
+                                                <input type="text" id="notes-{{ ip }}" class="alias-input" value="{{ device.notes }}" placeholder="e.g. Reserved IP, 2.4GHz only" autocomplete="off">
+                                            </div>
+                                            <div class="alias-actions">
+                                                <button type="submit" class="action-btn alias-save-btn">💾 Save Custom Details</button>
+                                                <span class="alias-msg" id="alias-msg-{{ ip }}"></span>
+                                            </div>
+                                        </form>
                                     </div>
                                     <div class="drawer-card">
                                         <div class="drawer-card-title">Discovery Timeline</div>
@@ -955,6 +1052,61 @@ HTML_DASHBOARD_TEMPLATE = """
             }).join('');
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function saveAlias(mac, ip, btnOrForm) {
+            if (window.event) window.event.stopPropagation();
+            const nickInput = document.getElementById(`nickname-${ip}`);
+            const notesInput = document.getElementById(`notes-${ip}`);
+            const msgEl = document.getElementById(`alias-msg-${ip}`);
+            const nickname = nickInput ? nickInput.value : '';
+            const notes = notesInput ? notesInput.value : '';
+
+            const btn = (btnOrForm && btnOrForm.tagName === 'BUTTON') ? btnOrForm : (btnOrForm ? btnOrForm.querySelector('.alias-save-btn') : null);
+            if (btn) btn.disabled = true;
+
+            fetch('/api/device/alias', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mac: mac, nickname: nickname, notes: notes })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (btn) btn.disabled = false;
+                if (data.success) {
+                    if (msgEl) {
+                        msgEl.style.color = 'var(--success)';
+                        msgEl.textContent = '✓ Saved!';
+                        setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2500);
+                    }
+                    refreshData();
+                } else {
+                    if (msgEl) {
+                        msgEl.style.color = '#dc2626';
+                        msgEl.textContent = '⚠️ ' + (data.error || 'Failed');
+                        setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 3000);
+                    }
+                }
+            })
+            .catch(err => {
+                if (btn) btn.disabled = false;
+                if (msgEl) {
+                    msgEl.style.color = '#dc2626';
+                    msgEl.textContent = '⚠️ Error saving';
+                    setTimeout(() => { if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; } }, 3000);
+                }
+                console.error("Save alias error:", err);
+            });
+        }
+
         async function refreshData() {
             try {
                 const res = await fetch('/api/devices');
@@ -1017,6 +1169,10 @@ HTML_DASHBOARD_TEMPLATE = """
                 const summaryEl = document.getElementById('categorySummary');
                 if (summaryEl) summaryEl.innerHTML = sumHtml;
 
+                const activeEl = document.activeElement;
+                const activeId = activeEl ? activeEl.id : null;
+                const activeVal = (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) ? activeEl.value : null;
+
                 let html = '';
                 for (const ip of sortedIps) {
                     const info = data.devices[ip];
@@ -1048,6 +1204,18 @@ HTML_DASHBOARD_TEMPLATE = """
                     const hasSsh = openPorts.includes(22);
                     const servicesHtml = renderServicesList(openPorts, info.services);
 
+                    let nameHtml = '';
+                    if (info.nickname) {
+                        nameHtml = `<span class="hostname nickname-active">${escapeHtml(info.nickname)}</span>
+                                    <span class="sub-hostname">(${escapeHtml(info.hostname)})</span>`;
+                    } else {
+                        nameHtml = `<span class="hostname">${escapeHtml(info.hostname)}</span>`;
+                    }
+                    const notesIndicator = info.notes ? `<span class="notes-indicator" title="${escapeHtml(info.notes)}">📝</span>` : '';
+
+                    const currentNick = (activeId === `nickname-${ip}` && activeVal !== null) ? activeVal : (info.nickname || '');
+                    const currentNotes = (activeId === `notes-${ip}` && activeVal !== null) ? activeVal : (info.notes || '');
+
                     html += `<tr class="device-row ${isExp ? 'expanded' : ''}" onclick="toggleDrawer('${ip}')" id="row-${ip}">
                         <td>
                             <div style="display: flex; align-items: center; gap: 6px;">
@@ -1066,7 +1234,8 @@ HTML_DASHBOARD_TEMPLATE = """
                         </td>
                         <td>
                             <div class="hostname-cell">
-                                <span class="hostname">${info.hostname}</span>
+                                ${nameHtml}
+                                ${notesIndicator}
                                 ${newBadge}
                                 ${badgeHtml}
                             </div>
@@ -1099,6 +1268,23 @@ HTML_DASHBOARD_TEMPLATE = """
                                         </div>
                                     </div>
                                     <div class="drawer-card">
+                                        <div class="drawer-card-title">Custom Identity & Notes</div>
+                                        <form class="alias-form" onsubmit="event.preventDefault(); saveAlias('${info.mac}', '${ip}', this);">
+                                            <div class="alias-field">
+                                                <label for="nickname-${ip}">Nickname</label>
+                                                <input type="text" id="nickname-${ip}" class="alias-input" value="${escapeHtml(currentNick)}" placeholder="e.g. Living Room TV, Dad's PC" autocomplete="off">
+                                            </div>
+                                            <div class="alias-field">
+                                                <label for="notes-${ip}">Notes / Tag</label>
+                                                <input type="text" id="notes-${ip}" class="alias-input" value="${escapeHtml(currentNotes)}" placeholder="e.g. Reserved IP, 2.4GHz only" autocomplete="off">
+                                            </div>
+                                            <div class="alias-actions">
+                                                <button type="submit" class="action-btn alias-save-btn">💾 Save Custom Details</button>
+                                                <span class="alias-msg" id="alias-msg-${ip}"></span>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <div class="drawer-card">
                                         <div class="drawer-card-title">Discovery Timeline</div>
                                         <div class="timeline-details">
                                             <div><strong>First Seen:</strong> <span>${info.first_seen || 'Current Session'}</span></div>
@@ -1112,6 +1298,16 @@ HTML_DASHBOARD_TEMPLATE = """
                     </tr>`;
                 }
                 tbody.innerHTML = html;
+
+                if (activeId && (activeId.startsWith('nickname-') || activeId.startsWith('notes-'))) {
+                    const restoredEl = document.getElementById(activeId);
+                    if (restoredEl) {
+                        restoredEl.focus();
+                        if (typeof restoredEl.setSelectionRange === 'function') {
+                            restoredEl.setSelectionRange(restoredEl.value.length, restoredEl.value.length);
+                        }
+                    }
+                }
             } catch (err) {
                 console.error("Refresh error:", err);
             }
