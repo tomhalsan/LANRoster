@@ -21,21 +21,15 @@ This document tracks upcoming planned features and architectural enhancements fo
   - **1-Click Web Launch**: One-click shortcuts to web admin consoles (HTTP/HTTPS) and SSH copy.
   - **Verified Services & Port Scanner**: High-speed concurrent TCP service scanner (`SocketServiceScanner`) detecting HTTP, HTTPS, SSH, SMB, IPP, Cast, and Apple Lockdown.
   - **On-Demand Inspection**: `POST /api/device/<ip>/scan-ports` endpoint and "⚡ Re-scan" button in drawer with real-time UI updates.
+- **Feature 4: Custom Device Nicknames & Notes (Persistent Aliases)**:
+  - **User-Defined Aliases**: Assign friendly nicknames (e.g. "Living Room Apple TV", "Dad's PC") and notes/tags (e.g. "Reserved IP in router", "2.4GHz only") keyed by hardware MAC address.
+  - **Prominent Display**: Custom nicknames display prominently in the device table with auto-discovered hostnames shown secondary; custom notes are visible with a hoverable `📝` indicator.
+  - **Drawer Customization Card**: Inline editing form in the expandable device drawer with asynchronous `POST /api/device/alias` saving without page reloads.
+  - **Durable Persistence**: `DeviceAliasRepositoryPort` with SQLite (`SqliteAliasRepository`) and in-memory (`InMemoryAliasRepository`) adapters, surviving reboots and subnet changes.
 
 ---
 
 ## 📋 Feature Backlog
-
-### Feature 4: Custom Device Nicknames & Notes (Persistent Aliases)
-- **User Overrides**: Allow users to assign friendly custom names (e.g. "Dad's Gaming Rig", "Living Room Apple TV", "Basement Thermostat") overriding or augmenting auto-discovered hostnames.
-- **Static Notes**: Add custom tags or notes per device (e.g. "Static IP assigned in router", "Kids' tablet").
-- **Persistence Adapter**: Store user aliases in a lightweight JSON or SQLite storage file (`~/.lan_roster/aliases.json`).
-- **Clean Architecture Plan**:
-  - `ports/alias_repository.py`: Interface for reading and saving custom device aliases and notes.
-  - `adapters/repository/json_alias.py`: File-based persistence adapter.
-  - `use_cases/update_device_alias.py`: Use case for mutating and persisting alias records.
-
----
 
 ### Feature 5: Wake-on-LAN (WoL) Integration
 - **One-Click Wake**: Send Ethernet Magic Packets (`FF:FF:FF:FF:FF:FF` + 16x MAC repeat) over UDP port 9 to wake sleeping computers (e.g. `PAPPA-CPPC`).

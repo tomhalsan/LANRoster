@@ -52,6 +52,8 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
 
                     first_seen = existing.first_seen or dev.first_seen or dev.last_seen
                     open_ports = dev.open_ports if dev.open_ports else existing.open_ports
+                    nickname = dev.nickname if dev.nickname else existing.nickname
+                    notes = dev.notes if dev.notes else existing.notes
 
                     self._devices[dev.ip] = Device(
                         ip=dev.ip,
@@ -65,6 +67,8 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                         is_online=True,
                         is_new=existing.is_new,
                         open_ports=open_ports,
+                        nickname=nickname,
+                        notes=notes,
                     )
                 else:
                     # Brand new device discovered for the first time
@@ -81,6 +85,8 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                         is_online=True,
                         is_new=True,
                         open_ports=dev.open_ports,
+                        nickname=dev.nickname,
+                        notes=dev.notes,
                     )
 
             # 2. Mark previously known devices that missed this sweep as offline/asleep
@@ -98,6 +104,8 @@ class InMemoryDeviceRepository(DeviceRepositoryPort):
                         is_online=False,
                         is_new=existing.is_new,
                         open_ports=existing.open_ports,
+                        nickname=existing.nickname,
+                        notes=existing.notes,
                     )
 
     def clear_devices(self) -> None:

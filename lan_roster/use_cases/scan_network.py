@@ -8,6 +8,7 @@ from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.repository import DeviceRepositoryPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
+from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 
 
 class ScanNetworkUseCase:
@@ -22,12 +23,14 @@ class ScanNetworkUseCase:
         manufacturer_repo: ManufacturerRepositoryPort,
         device_repo: DeviceRepositoryPort,
         service_scanner: ServiceScannerPort | None = None,
+        alias_repo: DeviceAliasRepositoryPort | None = None,
     ) -> None:
         self.scanner = scanner
         self.resolver = resolver
         self.manufacturer_repo = manufacturer_repo
         self.device_repo = device_repo
         self.service_scanner = service_scanner
+        self.alias_repo = alias_repo
 
     def execute(self) -> List[Device]:
         state = self.device_repo.get_scan_state()
@@ -60,6 +63,7 @@ class ScanNetworkUseCase:
             )
 
             # 4. Assemble domain entities
+            all_aliases = self.alias_repo.get_all_aliases() if self.alias_repo else {}
             device_entities: List[Device] = []
             for ip, mac in discovered_nodes:
                 vendor = self.manufacturer_repo.get_manufacturer(mac, ip=ip)
@@ -80,6 +84,10 @@ class ScanNetworkUseCase:
                     source=source,
                 )
 
+                alias = all_aliases.get(mac.upper())
+                nickname = alias.nickname if alias else ""
+                notes = alias.notes if alias else ""
+
                 device_entities.append(
                     Device(
                         ip=ip,
@@ -92,6 +100,8 @@ class ScanNetworkUseCase:
                         category=category,
                         is_online=True,
                         open_ports=open_ports_map.get(ip, []),
+                        nickname=nickname,
+                        notes=notes,
                     )
                 )
 

@@ -51,12 +51,29 @@ class DeviceCategory(str, Enum):
 
 
 @dataclass
+class DeviceAlias:
+    """User-assigned friendly nickname and persistent notes for a device by MAC address."""
+
+    mac: str
+    nickname: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "mac": self.mac,
+            "nickname": self.nickname,
+            "notes": self.notes,
+        }
+
+
+@dataclass
 class Device:
     """
     Domain entity representing an individual network node.
 
     Tracks identity (IP, MAC, Hostname, Source, Vendor, Category)
-    and real-time connection presence (first_seen, last_seen, is_online, is_new).
+    and real-time connection presence (first_seen, last_seen, is_online, is_new),
+    as well as user customizations (nickname, notes).
     """
 
     ip: str
@@ -70,6 +87,13 @@ class Device:
     is_online: bool = True
     is_new: bool = False
     open_ports: List[int] = field(default_factory=list)
+    nickname: str = ""
+    notes: str = ""
+
+    @property
+    def display_name(self) -> str:
+        """Returns user-assigned nickname if set, else auto-discovered hostname."""
+        return self.nickname if self.nickname else self.hostname
 
     @property
     def detected_services(self) -> Dict[int, str]:
@@ -92,6 +116,9 @@ class Device:
             "category_icon": self.category.icon,
             "open_ports": list(self.open_ports),
             "services": self.detected_services,
+            "nickname": self.nickname,
+            "notes": self.notes,
+            "display_name": self.display_name,
         }
 
 
