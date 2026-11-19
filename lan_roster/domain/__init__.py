@@ -1,9 +1,9 @@
-from lan_roster.domain.models import Device, HostnameSource, ScanState
 from lan_roster.domain.exceptions import (
-    LANRosterException,
     InvalidSubnetException,
+    LANRosterException,
     ScanExecutionException,
 )
+from lan_roster.domain.models import Device, HostnameSource, ScanState
 
 __all__ = [
     "Device",

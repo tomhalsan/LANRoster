@@ -1,4 +1,5 @@
 import ipaddress
+
 from lan_roster.domain.exceptions import InvalidSubnetException
 from lan_roster.ports.repository import DeviceRepositoryPort
 

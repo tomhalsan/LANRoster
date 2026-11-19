@@ -1,5 +1,6 @@
 import threading
 from typing import Dict, List
+
 from lan_roster.domain.models import Device, DeviceCategory, ScanState
 from lan_roster.ports.repository import DeviceRepositoryPort
 

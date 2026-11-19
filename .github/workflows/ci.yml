@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install project and development tooling
+        run: python -m pip install -e ".[dev]"
+      - name: Run unit tests (rootless, no live network)
+        run: python -m unittest discover tests
+      - name: Run Ruff
+        run: python -m ruff check .
+      - name: Run Pyrefly
+        run: python -m pyrefly check
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install build tooling
+        run: python -m pip install build twine
+      - name: Build wheel and source distribution
+        run: python -m build
+      - name: Check distributions
+        run: python -m twine check dist/*
+      - name: Smoke-test wheel in an isolated environment
+        run: |
+          python -m venv /tmp/lanroster-wheel-smoke
+          /tmp/lanroster-wheel-smoke/bin/python -m pip install dist/*.whl
+          /tmp/lanroster-wheel-smoke/bin/python - <<'EOF'
+          import os
+          import stat
+          import sysconfig
+          from importlib.metadata import distribution
+          from lan_roster import __version__
+
+          dist = distribution("lan-roster")
+          assert dist.version == __version__, (dist.version, __version__)
+
+          points = [
+              ep for ep in dist.entry_points
+              if ep.name == "lan-roster" and ep.group == "console_scripts"
+          ]
+          assert len(points) == 1, dist.entry_points
+          assert str(points[0].value) == "lan_roster.__main__:main"
+          assert callable(points[0].load())
+
+          script = os.path.join(sysconfig.get_path("scripts"), "lan-roster")
+          assert os.path.isfile(script), script
+          assert os.stat(script).st_mode & stat.S_IXUSR
+          print("wheel smoke test passed:", dist.version)
+          EOF

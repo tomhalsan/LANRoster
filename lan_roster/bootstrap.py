@@ -1,22 +1,23 @@
 import threading
-from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
-from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
+
+from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
+from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
+from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
+from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
+from lan_roster.adapters.resolvers.dns import SocketDNSResolver
+from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
 from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
-from lan_roster.adapters.resolvers.dns import SocketDNSResolver
-from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
-from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
-from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
-from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
-from lan_roster.adapters.network.system_config import SystemNetworkConfigAdapter
-from lan_roster.use_cases.scan_network import ScanNetworkUseCase
-from lan_roster.use_cases.get_devices import GetDevicesUseCase
-from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
-from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
-from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
+from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
+from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
 from lan_roster.ui.web import create_web_app
+from lan_roster.use_cases.get_devices import GetDevicesUseCase
+from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
+from lan_roster.use_cases.scan_network import ScanNetworkUseCase
+from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
+from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 
 
 def bootstrap():

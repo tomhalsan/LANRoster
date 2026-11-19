@@ -2,6 +2,7 @@ import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple
+
 from lan_roster.domain.models import HostnameSource
 from lan_roster.ports.resolver import HostnameResolverPort
 

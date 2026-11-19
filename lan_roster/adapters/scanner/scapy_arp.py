@@ -1,8 +1,10 @@
 import os
 import platform
 from typing import List, Tuple
+
 from scapy.layers.l2 import ARP, Ether
 from scapy.sendrecv import srp
+
 from lan_roster.ports.scanner import NetworkScannerPort
 
 

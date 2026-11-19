@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List
+
 from lan_roster.domain.models import Device, ScanState
 
 

@@ -71,9 +71,10 @@ Unlike simple ping sweeps or port scanners, LANRoster performs Layer 2 ARP sweep
 git clone https://github.com/tomhalsan/LANRoster.git
 cd LANRoster
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/python -m pip install -e ".[dev]"
 ```
+
+`pyproject.toml` is the authoritative dependency declaration. `requirements.txt` is a thin compatibility shim that installs the same development extra.
 
 ### 2. Run LANRoster
 
@@ -171,9 +172,16 @@ Run the unit test suite without needing root privileges or network hardware:
 .venv/bin/python -m unittest discover tests
 ```
 
-Verify static typing with Pyrefly:
+Verify lint and static typing:
 ```bash
+.venv/bin/python -m ruff check .
 .venv/bin/pyrefly check
+```
+
+Validate the distributable builds (wheel and source archive):
+```bash
+.venv/bin/python -m build
+.venv/bin/python -m twine check dist/*
 ```
 
 ---

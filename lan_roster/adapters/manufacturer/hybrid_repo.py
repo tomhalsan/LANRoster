@@ -1,6 +1,7 @@
 import socket
 import urllib.request
 from typing import Dict
+
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 
 

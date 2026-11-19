@@ -1,6 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
+
 from lan_roster.ports.service_scanner import ServiceScannerPort
 
 

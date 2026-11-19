@@ -1,4 +1,5 @@
 from typing import List
+
 from lan_roster.domain.exceptions import LANRosterException
 from lan_roster.ports.repository import DeviceRepositoryPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
