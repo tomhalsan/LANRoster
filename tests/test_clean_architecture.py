@@ -1,9 +1,12 @@
+import io
+import runpy
 import threading
 import unittest
 from typing import Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
 from lan_roster import __version__
+from lan_roster.__main__ import main as entry_point_main
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
 from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
 from lan_roster.adapters.repository.memory_alias import InMemoryAliasRepository
@@ -33,6 +36,12 @@ from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.resolver import HostnameResolverPort
 from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
+from lan_roster.server_config import (
+    ServerConfig,
+    format_startup_banner,
+    parse_server_config,
+    print_startup_banner,
+)
 from lan_roster.ui.web import create_web_app
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
@@ -1397,6 +1406,101 @@ class TestFeature4DeviceNicknamesAndNotes(unittest.TestCase):
         client_no_alias = app_no_alias.test_client()
         resp_501 = client_no_alias.post("/api/device/alias", json={"mac": "AA:BB:CC:DD:EE:FF"})
         self.assertEqual(resp_501.status_code, 501)
+
+
+class TestServerConfigurationAndEntryPoints(unittest.TestCase):
+    """
+    Issue #12 Verification: Default web server to localhost and require explicit LAN exposure.
+    Validates server configuration parsing, startup output warnings, entry point delegation,
+    and rootless/mocked execution invariants.
+    """
+
+    def test_default_binds_to_localhost(self):
+        config = parse_server_config([])
+        self.assertEqual(config.host, "127.0.0.1")
+        self.assertEqual(config.port, 8000)
+        self.assertTrue(config.is_loopback)
+
+    def test_lan_flag_binds_to_all_interfaces(self):
+        config = parse_server_config(["--lan"])
+        self.assertEqual(config.host, "0.0.0.0")
+        self.assertEqual(config.port, 8000)
+        self.assertFalse(config.is_loopback)
+
+    def test_unsupported_arguments_fail_via_argparse(self):
+        with patch("sys.stderr", new_callable=io.StringIO):
+            for bad_args in [["--host", "0.0.0.0"], ["--port", "8080"], ["--unknown"]]:
+                with self.subTest(args=bad_args):
+                    with self.assertRaises(SystemExit) as cm:
+                        parse_server_config(bad_args)
+                    self.assertEqual(cm.exception.code, 2)
+
+    def test_help_exits_with_code_zero(self):
+        with patch("sys.stdout", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit) as cm:
+                parse_server_config(["--help"])
+            self.assertEqual(cm.exception.code, 0)
+
+    def test_startup_banner_localhost_output(self):
+        banner = format_startup_banner(ServerConfig(host="127.0.0.1", port=8000))
+        self.assertIn("127.0.0.1:8000", banner)
+        self.assertIn("http://127.0.0.1:8000", banner)
+        self.assertIn("localhost only", banner)
+        self.assertNotIn("WARNING: LAN exposure active!", banner)
+
+    def test_startup_banner_lan_warning_output(self):
+        banner = format_startup_banner(ServerConfig(host="0.0.0.0", port=8000))
+        self.assertIn("0.0.0.0:8000", banner)
+        self.assertIn("all network interfaces", banner)
+        self.assertIn("WARNING: LAN exposure active!", banner)
+        self.assertIn("NO authentication or CSRF protection", banner)
+        self.assertIn("Any device that can reach this service may view and modify device roster state.", banner)
+        self.assertIn("trusted, private local network", banner)
+        self.assertIn("public internet", banner)
+        self.assertNotIn("http://0.0.0.0:8000", banner)
+
+    def test_print_startup_banner_writes_to_stream(self):
+        buf = io.StringIO()
+        print_startup_banner(ServerConfig(), out=buf)
+        self.assertIn("127.0.0.1:8000", buf.getvalue())
+
+    @patch("lan_roster.__main__.bootstrap")
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_main_runs_localhost_by_default(self, mock_stdout, mock_bootstrap):
+        mock_app = MagicMock()
+        mock_bootstrap.return_value = mock_app
+
+        entry_point_main([])
+
+        mock_bootstrap.assert_called_once()
+        mock_app.run.assert_called_once_with(host="127.0.0.1", port=8000)
+        self.assertIn("http://127.0.0.1:8000", mock_stdout.getvalue())
+
+    @patch("lan_roster.__main__.bootstrap")
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_main_runs_lan_when_opted_in(self, mock_stdout, mock_bootstrap):
+        mock_app = MagicMock()
+        mock_bootstrap.return_value = mock_app
+
+        entry_point_main(["--lan"])
+
+        mock_bootstrap.assert_called_once()
+        mock_app.run.assert_called_once_with(host="0.0.0.0", port=8000)
+        self.assertIn("WARNING: LAN exposure active!", mock_stdout.getvalue())
+
+    @patch("lan_roster.__main__.main")
+    @patch("lan_roster.bootstrap.bootstrap")
+    def test_app_py_delegates_to_main_when_executed(self, mock_bootstrap, mock_main):
+        runpy.run_path("app.py", run_name="__main__")
+        mock_main.assert_called_once()
+        mock_bootstrap.assert_not_called()
+
+    @patch("lan_roster.bootstrap.bootstrap")
+    def test_app_py_bootstraps_when_imported(self, mock_bootstrap):
+        mock_bootstrap.return_value = "sentinel_app"
+        module_globals = runpy.run_path("app.py", run_name="app")
+        mock_bootstrap.assert_called_once()
+        self.assertEqual(module_globals.get("app"), "sentinel_app")
 
 
 if __name__ == "__main__":

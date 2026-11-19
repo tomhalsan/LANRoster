@@ -152,8 +152,9 @@ lan_roster/
 │   ├── web.py                   # Flask controller, API routes, and request handling
 │   └── templates.py             # Embedded HTML/CSS/JS responsive dashboard
 │
+├── server_config.py             # Outer-boundary web server configuration & CLI parsing
 ├── bootstrap.py                 # Composition Root (Dependency Injection wiring)
-└── __main__.py                  # Package executable entry point (`python -m lan_roster`)
+└── __main__.py                  # Package executable entry point (`python -m lan_roster`, `lan-roster`)
 
 app.py                           # Root runner maintaining backwards compatibility
 tests/                           # Isolated unit tests with mock ports
@@ -254,9 +255,11 @@ The **Composition Root** is the single location where concrete components are in
   2. Injects adapters into use cases (`ScanNetworkUseCase`, `GetDevicesUseCase`, `UpdateSubnetUseCase`, `ScanDevicePortsUseCase`, `UpdateDeviceAliasUseCase`).
   3. Spawns a background worker thread governed by a `threading.Event` synchronization trigger.
   4. Passes use cases to the Flask primary adapter factory (`create_web_app`).
+- **Outer-Boundary Server Configuration**:
+  - [`lan_roster/server_config.py`](lan_roster/server_config.py): Encapsulates web server bind configuration (`ServerConfig`), enforcing safe loopback-only binding (`127.0.0.1:8000`) by default and requiring explicit operator opt-in (`--lan`) to bind across all interfaces (`0.0.0.0:8000`).
 - **Entry Points**:
-  - [`lan_roster/__main__.py`](lan_roster/__main__.py): Standard package entry point (`python -m lan_roster`).
-  - [`app.py`](app.py): Top-level convenience runner invoking `bootstrap()`.
+  - Console script `lan-roster` and package entry point [`lan_roster/__main__.py`](lan_roster/__main__.py) parse configuration, render startup status/warnings, bootstrap dependencies, and start the development server.
+  - [`app.py`](app.py): Top-level runner maintaining backward compatibility. When executed (`if __name__ == "__main__":`), it delegates directly to `lan_roster.__main__.main()`, ensuring identical binding policy and preventing duplicate bootstrapping; when imported as a module, it exposes `app = bootstrap()`.
 
 ---
 
@@ -376,7 +379,7 @@ SQLite storage is the current runtime implementation: [`SqliteDeviceRepository`]
 The items below are planned work from [ROADMAP.md](ROADMAP.md). They are **not** current v0.2.0 behavior and must not be read as implemented architecture.
 
 ### Planned v0.3: Security and stabilization
-- Localhost-first default binding, restricted subnet and device targets, and protection for state-changing operations. In v0.2.0 the server binds all host interfaces and state-changing routes have no application-level authentication or CSRF protection.
+- Localhost-first default binding (implemented in Issue #12), restricted subnet and device targets, and protection for state-changing operations. State-changing routes currently have no application-level authentication or CSRF protection.
 - UTC-aware durable timestamps, separation of presence scanning from enrichment, standard packaging and CI, and privacy-safe diagnostics.
 
 ### Planned v0.4: Durable identity and recovery
