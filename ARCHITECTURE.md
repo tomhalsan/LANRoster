@@ -347,8 +347,13 @@ By decoupling external dependencies through Ports, LANRoster achieves complete u
 # Run unit tests
 .venv/bin/python -m unittest discover tests
 
-# Verify static typing
+# Verify lint and static typing
+.venv/bin/python -m ruff check .
 .venv/bin/pyrefly check
+
+# Validate distributable builds (wheel and source archive)
+.venv/bin/python -m build
+.venv/bin/python -m twine check dist/*
 ```
 
 ---

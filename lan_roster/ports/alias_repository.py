@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict
+
 from lan_roster.domain.models import DeviceAlias
 
 

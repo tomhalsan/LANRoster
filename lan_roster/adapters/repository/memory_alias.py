@@ -1,5 +1,6 @@
 import threading
 from typing import Dict
+
 from lan_roster.domain.models import DeviceAlias
 from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 

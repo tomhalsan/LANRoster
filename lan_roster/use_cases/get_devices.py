@@ -1,4 +1,5 @@
 from typing import Dict, Tuple
+
 from lan_roster.domain.models import Device, ScanState
 from lan_roster.ports.repository import DeviceRepositoryPort
 

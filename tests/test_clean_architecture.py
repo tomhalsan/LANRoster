@@ -1,41 +1,44 @@
-import io
 import threading
 import unittest
 from typing import Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
 from lan_roster import __version__
-from lan_roster.domain.models import Device, DeviceAlias, DeviceCategory, HostnameSource, ScanState
-from lan_roster.domain.classifier import DeviceClassifier
-from lan_roster.domain.exceptions import (
-    LANRosterException,
-    InvalidSubnetException,
-    ScanExecutionException,
-)
-from lan_roster.ports.scanner import NetworkScannerPort
-from lan_roster.ports.resolver import HostnameResolverPort
-from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
-from lan_roster.ports.service_scanner import ServiceScannerPort
-from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
-from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
-from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
-from lan_roster.adapters.repository.memory_alias import InMemoryAliasRepository
-from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
 from lan_roster.adapters.manufacturer.hybrid_repo import HybridManufacturerRepository
+from lan_roster.adapters.repository.memory import InMemoryDeviceRepository
+from lan_roster.adapters.repository.memory_alias import InMemoryAliasRepository
+from lan_roster.adapters.repository.sqlite import SqliteDeviceRepository
+from lan_roster.adapters.repository.sqlite_alias import SqliteAliasRepository
 from lan_roster.adapters.resolvers.composite import CompositeHostnameResolver
-from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
-from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
+from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
 from lan_roster.adapters.resolvers.mdns import SocketMDNSResolver
 from lan_roster.adapters.resolvers.netbios import SocketNetBIOSResolver
 from lan_roster.adapters.resolvers.ssdp import SocketSSDPResolver
-from lan_roster.adapters.resolvers.http_banner import SocketHTTPBannerResolver
-from lan_roster.use_cases.scan_network import ScanNetworkUseCase
-from lan_roster.use_cases.get_devices import GetDevicesUseCase
-from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
-from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
-from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
+from lan_roster.adapters.scanner.scapy_arp import ScapyArpScanner
+from lan_roster.adapters.scanner.socket_service_scanner import SocketServiceScanner
+from lan_roster.domain.classifier import DeviceClassifier
+from lan_roster.domain.exceptions import (
+    InvalidSubnetException,
+    LANRosterException,
+    ScanExecutionException,
+)
+from lan_roster.domain.models import (
+    Device,
+    DeviceAlias,
+    DeviceCategory,
+    HostnameSource,
+    ScanState,
+)
+from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
+from lan_roster.ports.resolver import HostnameResolverPort
+from lan_roster.ports.scanner import NetworkScannerPort
+from lan_roster.ports.service_scanner import ServiceScannerPort
 from lan_roster.ui.web import create_web_app
-
+from lan_roster.use_cases.get_devices import GetDevicesUseCase
+from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
+from lan_roster.use_cases.scan_network import ScanNetworkUseCase
+from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
+from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 
 # ---------------------------------------------------------------------------
 # Test Doubles / Mock Ports
@@ -1194,8 +1197,8 @@ class TestFeature4DeviceNicknamesAndNotes(unittest.TestCase):
         self.assertIsNone(repo.get_alias("AA:BB:CC:DD:EE:01"))
 
     def test_sqlite_alias_repository_crud_and_persistence(self):
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             tmp_db = tmp.name
@@ -1246,8 +1249,8 @@ class TestFeature4DeviceNicknamesAndNotes(unittest.TestCase):
         self.assertEqual(saved_mem.notes, "Note1")
 
         # 2. SqliteDeviceRepository preserves nickname and notes
-        import tempfile
         import os
+        import tempfile
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             tmp_db = tmp.name
 

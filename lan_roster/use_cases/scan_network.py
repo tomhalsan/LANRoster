@@ -1,14 +1,15 @@
 import time
 from typing import List
-from lan_roster.domain.models import Device, HostnameSource
+
 from lan_roster.domain.classifier import DeviceClassifier
 from lan_roster.domain.exceptions import ScanExecutionException
-from lan_roster.ports.scanner import NetworkScannerPort
-from lan_roster.ports.resolver import HostnameResolverPort
+from lan_roster.domain.models import Device, HostnameSource
+from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 from lan_roster.ports.manufacturer import ManufacturerRepositoryPort
 from lan_roster.ports.repository import DeviceRepositoryPort
+from lan_roster.ports.resolver import HostnameResolverPort
+from lan_roster.ports.scanner import NetworkScannerPort
 from lan_roster.ports.service_scanner import ServiceScannerPort
-from lan_roster.ports.alias_repository import DeviceAliasRepositoryPort
 
 
 class ScanNetworkUseCase:

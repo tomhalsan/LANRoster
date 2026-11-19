@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lan-roster"
+description = "Lightweight, real-time local network device directory and scanner."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-2.0-only"
+authors = [
+    { name = "Tom Halsan" },
+]
+keywords = ["lan", "arp", "scanner", "inventory", "network"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dynamic = ["version"]
+dependencies = [
+    # Direct runtime imports only (Flask in lan_roster/ui/web.py,
+    # scapy in lan_roster/adapters/scanner/scapy_arp.py).
+    # Flask's own transitive dependencies are resolved by pip,
+    # not declared here.
+    "Flask>=3.1",
+    "scapy>=2.8",
+]
+urls = { Repository = "https://github.com/tomhalsan/LANRoster", Issues = "https://github.com/tomhalsan/LANRoster/issues" }
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.0",
+    "pyrefly>=1.0",
+    "ruff>=0.9",
+    "twine>=5.0",
+]
+
+[project.scripts]
+lan-roster = "lan_roster.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["lan_roster*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "lan_roster.__version__" }
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

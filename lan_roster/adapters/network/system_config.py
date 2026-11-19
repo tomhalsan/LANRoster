@@ -1,5 +1,6 @@
 import ipaddress
 import subprocess
+
 from lan_roster.ports.network_config import NetworkConfigPort
 
 

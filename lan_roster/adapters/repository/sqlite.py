@@ -3,6 +3,7 @@ import os
 import sqlite3
 import threading
 from typing import Dict, List
+
 from lan_roster.domain.models import Device, DeviceCategory, HostnameSource, ScanState
 from lan_roster.ports.repository import DeviceRepositoryPort
 

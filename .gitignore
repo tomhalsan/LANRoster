@@ -3,6 +3,14 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Python packaging and build output
+dist/
+build/
+*.egg-info/
+
+# Linter caches
+.ruff_cache/
+
 # SQLite database files and journals
 *.db
 *.db-wal

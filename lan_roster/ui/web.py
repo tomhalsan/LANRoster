@@ -1,13 +1,15 @@
 import threading
 from typing import Any, Dict
+
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
+
 from lan_roster import __version__
 from lan_roster.domain.exceptions import InvalidSubnetException
 from lan_roster.ui.templates import HTML_DASHBOARD_TEMPLATE
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
-from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
 from lan_roster.use_cases.update_device_alias import UpdateDeviceAliasUseCase
+from lan_roster.use_cases.update_subnet import UpdateSubnetUseCase
 
 
 def create_web_app(
