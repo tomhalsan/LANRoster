@@ -1,6 +1,8 @@
-# LANRoster - Product Roadmap & Backlog
+# LANRoster - Historical v0.2 Feature Backlog
 
-This document tracks upcoming planned features and architectural enhancements for LANRoster.
+This document records the feature backlog as it stood for the v0.2.0 release. It is historical: Features 1 through 4 below are complete in v0.2.0.
+
+For current planning, see [ROADMAP.md](ROADMAP.md). **GitHub issues and milestones are authoritative** for remaining scope, sequencing, and scheduling. If this document and GitHub differ, GitHub wins.
 
 ---
 
@@ -29,52 +31,19 @@ This document tracks upcoming planned features and architectural enhancements fo
 
 ---
 
-## 📋 Feature Backlog
+## 📋 Remaining Work (Tracked in GitHub)
 
-### Feature 5: Wake-on-LAN (WoL) Integration
-- **One-Click Wake**: Send Ethernet Magic Packets (`FF:FF:FF:FF:FF:FF` + 16x MAC repeat) over UDP port 9 to wake sleeping computers (e.g. `PAPPA-CPPC`).
-- **Clean Architecture Plan**:
-  - `ports/wol.py`: Port definition for dispatching Wake-on-LAN packets.
-  - `adapters/wol/socket_wol.py`: UDP socket implementation broadcasting to subnet `x.x.x.255`.
-  - `use_cases/wake_device.py`: Use case validating MAC address and invoking WoL port.
-  - `ui/`: Action button in device table or drawer.
+The former Features 5 through 8 are no longer planned in this document. Their current scope, acceptance criteria, and sequencing live in GitHub:
 
----
+| Historical feature | Current tracking | Milestone |
+| :--- | :--- | :--- |
+| Feature 5: Wake-on-LAN (WoL) Integration | [#26](https://github.com/tomhalsan/LANRoster/issues/26) | v0.8 |
+| Feature 6: Real-Time Ping Latency & Connection Quality (now bounded latency measurement) | [#27](https://github.com/tomhalsan/LANRoster/issues/27) | v0.8 |
+| Feature 7: External device identification / search enrichment (now an external vendor and optional AI enrichment architecture decision) | [#28](https://github.com/tomhalsan/LANRoster/issues/28) | v0.8 |
+| Feature 8: Dashboard UI/UX Redesign & Modern Layout | [#24](https://github.com/tomhalsan/LANRoster/issues/24) | v0.5 |
 
-### Feature 6: Real-Time Ping Latency & Connection Quality
-- **Round-Trip Latency**: Measure and display latency (e.g. `1.2 ms`, `38 ms`) next to each active device.
-- **Quality Indicator**: Color-code latency (Green: < 10ms wired/strong Wi-Fi; Yellow: 10–50ms; Red: > 50ms or packet loss).
-- **Clean Architecture Plan**:
-  - `ports/latency.py`: Interface for pinging network nodes.
-  - `adapters/latency/socket_ping.py`: Multi-threaded TCP/ICMP ping prober.
-  - `domain/models.py`: Store `latency_ms: float | None`.
-  - `ui/templates.py`: Add latency badge column with color-coding.
+Notes:
 
----
-
-### Feature 7: "Powered by Google" AI & Search Device Identification
-- **Automatic Signature Resolution**: Resolves cryptic hardware models (e.g. `V505M-K09`, `SM-G998U`, `ESP_2A4F10`) and obscure component OUI vendors (e.g. `Liteon`, `Chongqing Fugui`) into exact commercial product names, brands, and categories using Google Search grounding.
-- **100% Free-Tier Compatible**: Designed for Google AI Studio's free tier (1,500 queries/day, 15 RPM) using `gemini-2.0-flash`.
-- **Persistent Local Cache**: Results stored in `~/.lan_roster/device_cache.json`. Each obscure signature is queried to Google **only once ever**, using 0 API calls on subsequent passes.
-- **Three-Tier User Experience**:
-  - **Tier 1 (No API Key)**: Runs 100% locally with Probes A–E + client-side 1-click **"🔍 Search Google"** deep-link button on unknown devices.
-  - **Tier 2 (Free Google AI Studio Key)**: Automatic silent background enrichment with Google Search Grounding.
-  - **Tier 3 (Paid/Enterprise Key)**: High-speed resolution across large multi-subnet environments.
-- **Clean Architecture Plan**:
-  - `ports/enricher.py`: `DeviceEnrichmentPort` contract.
-  - `adapters/enricher/gemini_enricher.py`: Adapter calling Gemini API with search grounding.
-  - `adapters/enricher/cached_enricher.py`: File-backed cache decorator.
-  - `ui/templates.py`: Display `✨ Google Identified` badge and 1-click Google search button for unknown devices.
-
----
-
-### Feature 8: Dashboard UI/UX Redesign & Modern Layout
-- **Calm Visual Hierarchy**: Eliminate multi-badge visual noise by consolidating IP address and protocol source underneath the primary device name (`Badunkadunk` / `10.0.0.232 • via mDNS`), giving columns generous breathing room.
-- **Interactive Category Filter Tabs**: Convert static category breakdown chips into clickable filter tabs (`All (24)`, `📱 Mobile (5)`, `💻 Computer (3)`, etc.) that instantly filter the device table client-side.
-- **Single Presence & Human Timestamps**: Unify presence dots to a single indicator next to the device name; format last-seen timestamps relatively (`Just now`, `4m ago`, `Yesterday`) with hover tooltips for exact seconds.
-- **Progressive Disclosure**: Tuck reference and troubleshooting guides (Protocol Legend and Windows Firewall steps) into collapsible on-demand sections so data stays front and center.
-- **Clean Architecture Plan**:
-  - `ui/templates.py`: Modernize CSS styling, table layout, and client-side tab filtering logic.
-  - `tests/test_clean_architecture.py`: Update presentation layer assertions to verify new layout and tab markup.
-
-
+- No provider-specific model, quota, or free-tier promises are made here. Any external lookup or enrichment remains optional, transparent, and separate from local authoritative state, and requires the architecture decision in [#28](https://github.com/tomhalsan/LANRoster/issues/28) before implementation.
+- Latency measurement, if implemented, is opt-in and rate-limited as described in [#27](https://github.com/tomhalsan/LANRoster/issues/27) and the v0.8 milestone in [ROADMAP.md](ROADMAP.md).
+- Wake-on-LAN, if implemented, is limited to authorized, known eligible devices as described in [#26](https://github.com/tomhalsan/LANRoster/issues/26).
