@@ -81,18 +81,35 @@ python3 -m venv .venv
 Because Scapy crafts Layer 2 Ethernet ARP packets, execute the server with root privileges:
 
 ```bash
-sudo .venv/bin/python app.py
+sudo .venv/bin/lan-roster
 ```
-*(or via package execution: `sudo .venv/bin/python -m lan_roster`)*
+*(or via root runner `sudo .venv/bin/python app.py` or module execution `sudo .venv/bin/python -m lan_roster`)*
+
+By default, LANRoster binds strictly to **`127.0.0.1:8000`** (localhost only), limiting direct network access to the local machine by default.
+
+#### Explicit Local Network (LAN) Exposure
+
+To allow other devices on your trusted local network to access the dashboard, pass the `--lan` flag:
+
+```bash
+sudo .venv/bin/lan-roster --lan
+```
+*(or `sudo .venv/bin/python app.py --lan`)*
+
+Passing `--lan` explicitly binds the web server to all network interfaces (`0.0.0.0:8000`).
 
 ### 3. Open the Dashboard
 
-Navigate to:
+Navigate in your web browser to:
 ```
-http://localhost:8000
+http://127.0.0.1:8000
 ```
 
-The current v0.2.0 entry points bind the Flask development server to all host interfaces (`0.0.0.0:8000`), so the dashboard and API may be reachable, depending on the host firewall and network configuration, from other devices on the local network while it runs. LANRoster does not currently provide application-level authentication or CSRF protection for its state-changing routes. Run it only on a trusted local network. Localhost-first binding and protection for state-changing operations are planned v0.3 work in [ROADMAP.md](ROADMAP.md), not implemented behavior in v0.2.0.
+> **Security & Operational Boundaries**:
+> - **Localhost by default**: LANRoster defaults to loopback binding (`127.0.0.1:8000`) so network monitoring stays private to the host operator.
+> - **Explicit LAN exposure**: Passing `--lan` binds to `0.0.0.0:8000`. Depending on host firewall and network configuration, other devices on the local subnet may reach the dashboard and API while it runs.
+> - **No authentication or CSRF protection**: LANRoster does not currently provide application-level user authentication or CSRF protection for its state-changing routes (e.g. `/scan`, `/api/set-subnet`, `/api/device/alias`). When using `--lan`, run only on a trusted private local network. Never expose the server to untrusted networks or the public internet.
+> - **Development server limitations**: Flask's built-in development server is intended for single-operator local use and is not designed or supported as a production-grade web service. Protection for state-changing operations and target restrictions are planned v0.3 work in [ROADMAP.md](ROADMAP.md).
 
 ---
 
