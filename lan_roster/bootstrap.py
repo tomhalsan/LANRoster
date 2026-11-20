@@ -38,7 +38,7 @@ def bootstrap():
     if network_scanner.is_windows() and not network_scanner.check_windows_npcap_installed():
         npcap_msg = (
             'Npcap driver not detected! Windows requires Npcap for Layer 2 ARP scanning. '
-            'Please install Npcap from <a href="https://npcap.com" target="_blank" style="color: #991b1b; font-weight: 700; text-decoration: underline;">https://npcap.com</a> '
+            'Please install Npcap from <a href="https://npcap.com" target="_blank" rel="noopener noreferrer" style="color: #991b1b; font-weight: 700; text-decoration: underline;">https://npcap.com</a> '
             '(check "Install Npcap in WinPcap API-compatible Mode") and run as Administrator.'
         )
         device_repository.update_scan_state(error_message=npcap_msg)

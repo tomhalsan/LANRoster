@@ -1,4 +1,5 @@
 import io
+import re
 import runpy
 import threading
 import unittest
@@ -42,6 +43,7 @@ from lan_roster.server_config import (
     parse_server_config,
     print_startup_banner,
 )
+from lan_roster.ui.templates import HTML_DASHBOARD_TEMPLATE
 from lan_roster.ui.web import create_web_app
 from lan_roster.use_cases.get_devices import GetDevicesUseCase
 from lan_roster.use_cases.scan_device_ports import ScanDevicePortsUseCase
@@ -1501,6 +1503,150 @@ class TestServerConfigurationAndEntryPoints(unittest.TestCase):
         module_globals = runpy.run_path("app.py", run_name="app")
         mock_bootstrap.assert_called_once()
         self.assertEqual(module_globals.get("app"), "sentinel_app")
+
+
+class TestIssue41MarkupAndLinkIntegrity(unittest.TestCase):
+    """
+    Issue #41 Verification: Clean HTML markup, safe link attributes, and absence
+    of rich-text injection artifacts across bootstrap guidance and dashboard templates.
+    """
+
+    @patch("lan_roster.bootstrap.create_web_app")
+    @patch("lan_roster.bootstrap.threading.Thread")
+    @patch("lan_roster.bootstrap.SqliteAliasRepository")
+    @patch("lan_roster.bootstrap.SqliteDeviceRepository")
+    @patch("lan_roster.bootstrap.ScapyArpScanner")
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_windows_npcap_guidance_link_attributes_and_clean_markup(
+        self, mock_stdout, mock_scanner_cls, mock_repo_cls, mock_alias_repo_cls, mock_thread_cls, mock_web_app
+    ):
+        from lan_roster.bootstrap import bootstrap
+
+        mock_scanner = MagicMock()
+        mock_scanner.is_windows.return_value = True
+        mock_scanner.check_windows_npcap_installed.return_value = False
+        mock_scanner_cls.return_value = mock_scanner
+
+        mock_repo = MagicMock()
+        mock_repo.db_path = ":memory:"
+        mock_repo_cls.return_value = mock_repo
+
+        mock_thread = MagicMock()
+        mock_thread_cls.return_value = mock_thread
+
+        bootstrap()
+
+        mock_repo.update_scan_state.assert_called_once()
+        _, kwargs = mock_repo.update_scan_state.call_args
+        error_msg = kwargs.get("error_message", "")
+
+        # 1. External link security attributes
+        self.assertIn('href="https://npcap.com"', error_msg)
+        self.assertIn('target="_blank"', error_msg)
+        self.assertIn('rel="noopener noreferrer"', error_msg)
+
+        # 2. Absence of rich-text injection and malformed markup
+        self.assertNotIn("fai-ChatInputEntity", error_msg)
+        self.assertNotIn("fai-", error_msg)
+        self.assertNotIn("\\<a", error_msg)
+        self.assertNotIn("\\>", error_msg)
+        # Ensure no nested anchor tags
+        self.assertIsNone(re.search(r"<a\b[^>]*>[^<]*<a\b", error_msg))
+
+    def test_dashboard_template_server_rendered_drawer_actions(self):
+        # 1. Verify valid server-rendered HTTP action
+        self.assertIn(
+            '<a href="http://{{ ip }}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🌐 Open Web Admin (http://{{ ip }}) ↗</a>',
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 2. Verify valid server-rendered HTTPS action
+        self.assertIn(
+            '<a href="https://{{ ip }}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">🔒 Open HTTPS Admin (https://{{ ip }}) ↗</a>',
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 3. Verify valid server-rendered SSH action
+        self.assertIn(
+            '<button type="button" class="action-btn" onclick="copyText(\'ssh {{ ip }}\', this)">💻 Copy SSH: ssh {{ ip }}</button>',
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 4. Absence of rich-text artifacts or malformed escapes
+        self.assertNotIn("fai-ChatInputEntity", HTML_DASHBOARD_TEMPLATE)
+        self.assertNotIn("ChatInput", HTML_DASHBOARD_TEMPLATE)
+        self.assertNotIn("\\<a", HTML_DASHBOARD_TEMPLATE)
+        self.assertNotIn("\\<button", HTML_DASHBOARD_TEMPLATE)
+
+    def test_dashboard_template_client_rendered_drawer_actions(self):
+        # 1. Verify valid client-rendered HTTP action with valid JS template literal backticks
+        self.assertIn(
+            "${hasHttp ? `<a href=\"http://${ip}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"action-btn web-btn\">🌐 Open Web Admin (http://${ip}) ↗</a>` : ''}",
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 2. Verify valid client-rendered HTTPS action with valid JS template literal backticks
+        self.assertIn(
+            "${hasHttps ? `<a href=\"https://${ip}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"action-btn web-btn\">🔒 Open HTTPS Admin (https://${ip}) ↗</a>` : ''}",
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 3. Verify valid client-rendered SSH action with valid JS template literal backticks
+        self.assertIn(
+            "${hasSsh ? `<button type=\"button\" class=\"action-btn\" onclick=\"copyText('ssh ${ip}', this)\">💻 Copy SSH: ssh ${ip}</button>` : ''}",
+            HTML_DASHBOARD_TEMPLATE,
+        )
+        # 4. Ensure no stray backslashes or malformed anchor delimiters around client actions
+        drawer_action_snippet = HTML_DASHBOARD_TEMPLATE[
+            HTML_DASHBOARD_TEMPLATE.find('<div class="drawer-action-group">') : HTML_DASHBOARD_TEMPLATE.find(
+                '</div>\n                                    </div>\n                                    <div class="drawer-card">\n                                        <div class="drawer-card-title" style="display: flex;'
+            )
+        ]
+        self.assertNotIn("\\<a", drawer_action_snippet)
+        self.assertNotIn("\\<button", drawer_action_snippet)
+        self.assertNotIn("fai-", drawer_action_snippet)
+
+    def test_rendered_dashboard_contains_safe_actions_without_rich_text_artifacts(self):
+        repo = InMemoryDeviceRepository()
+        repo.save_devices([
+            Device(
+                ip="10.0.0.1",
+                mac="AA:BB:CC:DD:EE:01",
+                hostname="router.local",
+                open_ports=[80, 443, 22],
+            )
+        ])
+        npcap_err = (
+            'Npcap driver not detected! Windows requires Npcap for Layer 2 ARP scanning. '
+            'Please install Npcap from <a href="https://npcap.com" target="_blank" rel="noopener noreferrer" style="color: #991b1b; font-weight: 700; text-decoration: underline;">https://npcap.com</a> '
+            '(check "Install Npcap in WinPcap API-compatible Mode") and run as Administrator.'
+        )
+        repo.update_scan_state(error_message=npcap_err)
+
+        get_devices_uc = GetDevicesUseCase(device_repo=repo)
+        update_subnet_uc = UpdateSubnetUseCase(device_repo=repo)
+        app = create_web_app(
+            get_devices_use_case=get_devices_uc,
+            update_subnet_use_case=update_subnet_uc,
+            scan_trigger=threading.Event(),
+        )
+        client = app.test_client()
+        resp = client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode("utf-8")
+
+        # Verify Npcap guidance in error banner includes safe external link attributes
+        self.assertIn('href="https://npcap.com"', html)
+        self.assertIn('target="_blank"', html)
+        self.assertIn('rel="noopener noreferrer"', html)
+
+        # Verify server-rendered actions
+        self.assertIn('<a href="http://10.0.0.1" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">', html)
+        self.assertIn('<a href="https://10.0.0.1" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">', html)
+        self.assertIn('<button type="button" class="action-btn" onclick="copyText(\'ssh 10.0.0.1\', this)">', html)
+
+        # Verify client-rendered template inside <script>
+        self.assertIn('${hasHttp ? `<a href="http://${ip}" target="_blank" rel="noopener noreferrer" class="action-btn web-btn">', html)
+
+        # Verify absence of rich-text injection and nested anchors across entire rendered page
+        self.assertNotIn("fai-ChatInputEntity", html)
+        self.assertNotIn("fai-", html)
+        self.assertIsNone(re.search(r"<a\b[^>]*>[^<]*<a\b", html))
 
 
 if __name__ == "__main__":
