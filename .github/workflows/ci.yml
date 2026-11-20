@@ -69,3 +69,26 @@ jobs:
           assert os.stat(script).st_mode & stat.S_IXUSR
           print("wheel smoke test passed:", dist.version)
           EOF
+
+  ci-gate:
+    name: CI Gate
+    if: ${{ always() }}
+    needs:
+      - test
+      - package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify required jobs
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        run: |
+          printf 'test result: %s\n' "$TEST_RESULT"
+          printf 'package result: %s\n' "$PACKAGE_RESULT"
+
+          if [ "$TEST_RESULT" != "success" ] || [ "$PACKAGE_RESULT" != "success" ]; then
+            echo "One or more required CI jobs did not succeed."
+            exit 1
+          fi
